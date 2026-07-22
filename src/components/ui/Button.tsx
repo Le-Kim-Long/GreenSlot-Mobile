@@ -31,7 +31,7 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? colors.white : colors.green[600]} />
       ) : (
-        <Text style={[styles.text, textVariantStyles[variant]]}>{title}</Text>
+        <Text style={[styles.text, textVariantStyles[variant], { textAlign: 'center', width: '100%' }]}>{title}</Text>
       )}
     </TouchableOpacity>
   );

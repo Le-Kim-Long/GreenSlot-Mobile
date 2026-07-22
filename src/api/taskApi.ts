@@ -1,21 +1,38 @@
 import apiClient from './client';
-import type { GardeningTask, ServiceRequest, ServiceType } from '../types/api';
+import type {
+  GardeningTaskResponseDTO,
+  IssueReportRequestDTO,
+  ServiceRequestDTO,
+  ServiceTypeDTO,
+  TaskAssignmentDTO,
+  TaskStatusUpdateDTO,
+} from '../types/api';
 
 export const taskApi = {
-  requestService: (data: ServiceRequest) =>
+  requestService: (data: ServiceRequestDTO): Promise<GardeningTaskResponseDTO> =>
     apiClient.post('/services/request', data).then(r => r.data),
 
-  getMyTasks: (): Promise<GardeningTask[]> =>
+  assignTask: (data: TaskAssignmentDTO): Promise<GardeningTaskResponseDTO> =>
+    apiClient.post('/tasks/assign', data).then(r => r.data),
+
+  assignTaskByPath: (taskId: number, data: TaskAssignmentDTO): Promise<GardeningTaskResponseDTO> =>
+    apiClient.patch(`/tasks/${taskId}/assign`, data).then(r => r.data),
+
+  getMyTasks: (): Promise<GardeningTaskResponseDTO[]> =>
     apiClient.get('/tasks/my-tasks').then(r => r.data),
 
-  updateTaskStatus: (taskId: number, status: string, evidenceImageUrl?: string) =>
-    apiClient.put(`/tasks/${taskId}/status`, { status, evidenceImageUrl }).then(r => r.data),
+  updateTaskStatus: (taskId: number, dataOrStatus: TaskStatusUpdateDTO | string, evidenceImageUrl?: string): Promise<GardeningTaskResponseDTO> => {
+    const payload: TaskStatusUpdateDTO = typeof dataOrStatus === 'string'
+      ? { status: dataOrStatus, evidenceImageUrl }
+      : dataOrStatus;
+    return apiClient.patch(`/tasks/${taskId}/status`, payload).then(r => r.data);
+  },
 
-  reportIssue: (taskId: number, data: { issueTitle: string; description: string }) =>
+  reportIssue: (taskId: number, data: IssueReportRequestDTO): Promise<GardeningTaskResponseDTO> =>
     apiClient.post(`/tasks/${taskId}/report-issue`, data).then(r => r.data),
 };
 
 export const managerApi = {
-  getServiceTypes: (): Promise<ServiceType[]> =>
+  getServiceTypes: (): Promise<ServiceTypeDTO[]> =>
     apiClient.get('/manager/service-types').then(r => r.data),
 };

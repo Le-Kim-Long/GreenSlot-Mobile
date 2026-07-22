@@ -4,6 +4,8 @@ import { LoadingScreen } from '../components/ui/LoadingScreen';
 import { AuthStack } from './AuthStack';
 import { CustomerStack } from './CustomerStack';
 import { GardenStaffStack } from './GardenStaffStack';
+import { StaffStack } from './StaffStack';
+import { AdminStack } from './AdminStack';
 import StaffSummaryScreen from '../screens/staff/StaffSummaryScreen';
 import type { RootStackParamList } from './types';
 
@@ -16,14 +18,20 @@ export function RootNavigator() {
     return <LoadingScreen />;
   }
 
+  const role = user?.role as string | undefined;
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!isAuthenticated ? (
         <Stack.Screen name="Auth" component={AuthStack} />
-      ) : user?.role === 'customer' ? (
+      ) : role === 'customer' ? (
         <Stack.Screen name="Customer" component={CustomerStack} />
-      ) : user?.role === 'garden_staff' ? (
+      ) : role === 'garden_staff' ? (
         <Stack.Screen name="GardenStaff" component={GardenStaffStack} />
+      ) : role === 'manager' || role === 'location_manager' ? (
+        <Stack.Screen name="Staff" component={StaffStack} />
+      ) : role === 'admin' ? (
+        <Stack.Screen name="Admin" component={AdminStack} />
       ) : (
         <Stack.Screen name="StaffSummary" component={StaffSummaryScreen} />
       )}

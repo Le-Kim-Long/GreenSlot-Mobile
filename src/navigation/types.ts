@@ -17,23 +17,56 @@ export type CustomerTabParamList = {
 };
 
 export type CustomerStackParamList = {
-  CustomerTabs: NavigatorScreenParams<CustomerTabParamList>;
+  CustomerTabs: undefined;
   GardenDetail: { slot: AvailableSlotDTO };
   IoTMonitoring: undefined;
   CareServices: undefined;
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
+  Notifications: undefined;
+};
+
+export type GardenStaffTabParamList = {
+  GardenStaffDashboard: undefined;
+  TaskManagement: undefined;
+  StaffList: undefined;
+  Account: undefined;
 };
 
 export type GardenStaffStackParamList = {
-  GardenStaffDashboard: undefined;
+  GardenStaffTabs: undefined;
   TaskDetail: { taskId: number };
+  IoTMonitoring: undefined;
+};
+
+export type StaffTabParamList = {
+  StaffDashboard: undefined;
+  Account: undefined;
+};
+
+export type StaffStackParamList = {
+  StaffTabs: undefined;
+  LocationManagement: undefined;
+  PillarManagement: undefined;
+  SlotManagement: undefined;
+  ServiceManagement: undefined;
+  ActiveRentals: undefined;
+  RevenueAnalytics: undefined;
+};
+
+export type AdminStackParamList = {
+  AdminDashboard: undefined;
+  UserManagement: undefined;
+  GlobalContent: undefined;
+  AuditLog: undefined;
 };
 
 export type RootStackParamList = {
-  Auth: NavigatorScreenParams<AuthStackParamList>;
-  Customer: NavigatorScreenParams<CustomerStackParamList>;
-  GardenStaff: NavigatorScreenParams<GardenStaffStackParamList>;
+  Auth: undefined;
+  Customer: undefined;
+  GardenStaff: undefined;
+  Staff: undefined;
+  Admin: undefined;
   StaffSummary: undefined;
 };
 

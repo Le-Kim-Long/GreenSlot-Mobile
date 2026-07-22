@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity } from 'react-native';
-import { CheckCircle } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CheckCircle, LogOut } from 'lucide-react-native';
 import { taskApi } from '../../api/taskApi';
 import type { GardeningTask } from '../../types/api';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
@@ -30,9 +31,36 @@ export default function GardenStaffDashboardScreen() {
     load().finally(() => setLoading(false));
   }, [load]);
 
-  const updateStatus = async (taskId: number, status: string) => {
+  const updateStatus = async (taskId: number, status: string, evidenceImageUrl?: string) => {
+    if (status === 'COMPLETED' && (!evidenceImageUrl || !evidenceImageUrl.trim())) {
+      Alert.prompt(
+        'Bằng chứng hoàn thành',
+        'Vui lòng nhập URL hình ảnh minh họa kết quả (bắt buộc):',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Gửi hoàn thành',
+            onPress: async (url?: string) => {
+              if (!url || !url.trim()) {
+                Alert.alert('Lỗi', 'Bắt buộc nhập URL hình ảnh bằng chứng!');
+                return;
+              }
+              try {
+                await taskApi.updateTaskStatus(taskId, { status: 'COMPLETED', evidenceImageUrl: url.trim() });
+                await load();
+              } catch {
+                Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
+              }
+            },
+          },
+        ],
+        'plain-text'
+      );
+      return;
+    }
+
     try {
-      await taskApi.updateTaskStatus(taskId, status);
+      await taskApi.updateTaskStatus(taskId, { status, evidenceImageUrl });
       await load();
     } catch {
       Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
@@ -42,10 +70,11 @@ export default function GardenStaffDashboardScreen() {
   if (loading) return <LoadingScreen />;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Xin chào, {user?.name}</Text>
         <TouchableOpacity style={styles.logout} onPress={logout} activeOpacity={0.8}>
+          <LogOut size={16} color={colors.white} style={{ marginRight: 4 }} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
@@ -92,7 +121,7 @@ export default function GardenStaffDashboardScreen() {
           );
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -107,6 +136,8 @@ const styles = StyleSheet.create({
   },
   greeting: { ...typography.heading3, color: colors.white },
   logout: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.white,
     borderRadius: radius.md,

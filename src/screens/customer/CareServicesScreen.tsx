@@ -29,7 +29,7 @@ export default function CareServicesScreen() {
       setRentals(active);
       setServices(types);
       if (active.length) setSelectedRental(active[0].id);
-      if (types.length) setSelectedService(types[0].id);
+      if (types.length && types[0].id != null) setSelectedService(types[0].id);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -86,13 +86,14 @@ export default function CareServicesScreen() {
           <TouchableOpacity
             key={s.id}
             style={[styles.option, selectedService === s.id && styles.optionSelected]}
-            onPress={() => setSelectedService(s.id)}
+            onPress={() => { if (s.id != null) setSelectedService(s.id); }}
           >
             <Text style={styles.optionTitle}>{s.name}</Text>
             <Text style={styles.optionSub}>{formatCurrency(s.price)}</Text>
           </TouchableOpacity>
         ))}
       </Card>
+
 
       <Input
         label="Mô tả thêm (tuỳ chọn)"
