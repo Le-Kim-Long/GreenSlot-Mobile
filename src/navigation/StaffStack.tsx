@@ -8,7 +8,16 @@ import PillarManagementScreen from '../screens/staff/PillarManagementScreen';
 import SlotManagementScreen from '../screens/staff/SlotManagementScreen';
 import ServiceManagementScreen from '../screens/staff/ServiceManagementScreen';
 import ActiveRentalsScreen from '../screens/staff/ActiveRentalsScreen';
+import ActiveRentalDetailScreen from '../screens/staff/ActiveRentalDetailScreen';
 import RevenueAnalyticsScreen from '../screens/staff/RevenueAnalyticsScreen';
+import TreeManagementScreen from '../screens/staff/TreeManagementScreen';
+import EquipmentManagementScreen from '../screens/staff/EquipmentManagementScreen';
+import StaffScheduleManagementScreen from '../screens/staff/StaffScheduleManagementScreen';
+import TreePlantingManagementScreen from '../screens/staff/TreePlantingManagementScreen';
+import AlertAnalyticsScreen from '../screens/staff/AlertAnalyticsScreen';
+import AlertHistoryScreen from '../screens/staff/AlertHistoryScreen';
+import AlertProcessingScreen from '../screens/staff/AlertProcessingScreen';
+import CustomerAnalyticsScreen from '../screens/staff/CustomerAnalyticsScreen';
 import AccountScreen from '../screens/customer/AccountScreen';
 import { colors } from '../theme/colors';
 import type { StaffTabParamList, StaffStackParamList } from './types';
@@ -59,7 +68,17 @@ export function StaffStack() {
       <Stack.Screen name="SlotManagement" component={SlotManagementScreen} />
       <Stack.Screen name="ServiceManagement" component={ServiceManagementScreen} />
       <Stack.Screen name="ActiveRentals" component={ActiveRentalsScreen} />
+      <Stack.Screen name="ActiveRentalDetail" component={ActiveRentalDetailScreen} />
       <Stack.Screen name="RevenueAnalytics" component={RevenueAnalyticsScreen} />
+      <Stack.Screen name="TreeManagement" component={TreeManagementScreen} />
+      <Stack.Screen name="EquipmentManagement" component={EquipmentManagementScreen} />
+      <Stack.Screen name="StaffScheduleManagement" component={StaffScheduleManagementScreen} />
+      <Stack.Screen name="TreePlantingManagement" component={TreePlantingManagementScreen} />
+      <Stack.Screen name="AlertAnalytics" component={AlertAnalyticsScreen} />
+      <Stack.Screen name="AlertHistory" component={AlertHistoryScreen} />
+      <Stack.Screen name="AlertProcessing" component={AlertProcessingScreen} />
+      <Stack.Screen name="CustomerAnalytics" component={CustomerAnalyticsScreen} />
     </Stack.Navigator>
   );
 }
+

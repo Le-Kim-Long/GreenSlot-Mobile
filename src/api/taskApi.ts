@@ -34,5 +34,14 @@ export const taskApi = {
 
 export const managerApi = {
   getServiceTypes: (): Promise<ServiceTypeDTO[]> =>
-    apiClient.get('/manager/service-types').then(r => r.data),
+    apiClient.get('/manager/service-types').then(r =>
+      (r.data as Array<Record<string, unknown>>).map(s => ({
+        id:                s.id as number | undefined,
+        name:              (s.serviceName ?? s.name) as string,
+        description:       s.description as string | undefined,
+        price:             Number(s.price),
+        serviceCategoryId: (s.categoryId ?? s.serviceCategoryId) as number,
+        serviceCategoryName: s.serviceCategoryName as string | undefined,
+      } as ServiceTypeDTO))
+    ),
 };

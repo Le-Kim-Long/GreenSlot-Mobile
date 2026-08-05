@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle, LogOut } from 'lucide-react-native';
+import { CheckCircle, LogOut, ShieldAlert, ChevronRight } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { GardenStaffStackParamList } from '../../navigation/types';
 import { taskApi } from '../../api/taskApi';
 import type { GardeningTask } from '../../types/api';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
@@ -13,6 +16,7 @@ import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 
 export default function GardenStaffDashboardScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<GardenStaffStackParamList>>();
   const { user, logout } = useAuth();
   const [tasks, setTasks] = useState<GardeningTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +83,21 @@ export default function GardenStaffDashboardScreen() {
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity
+        style={styles.alertShortcut}
+        onPress={() => navigation.navigate('GardenStaffAlert')}
+        activeOpacity={0.8}
+      >
+        <View style={styles.alertIconBox}>
+          <ShieldAlert size={22} color="#dc2626" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.alertShortcutTitle}>Báo cáo Sự cố IoT Alert</Text>
+          <Text style={styles.alertShortcutSub}>Cập nhật kết quả xử lý khi thiết bị hoặc ô đất gặp cảnh báo</Text>
+        </View>
+        <ChevronRight size={20} color="#dc2626" />
+      </TouchableOpacity>
+
       <FlatList
         data={tasks}
         keyExtractor={item => item.id.toString()}
@@ -127,6 +146,36 @@ export default function GardenStaffDashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  alertShortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    gap: 12,
+  },
+  alertIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertShortcutTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#b91c1c',
+    marginBottom: 2,
+  },
+  alertShortcutSub: {
+    fontSize: 12,
+    color: '#ef4444',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

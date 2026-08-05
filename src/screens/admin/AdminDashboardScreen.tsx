@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, FileText, ShieldAlert, Activity, ChevronRight, RefreshCw, LogOut } from 'lucide-react-native';
+import { Users, FileText, ShieldAlert, Activity, ChevronRight, RefreshCw, LogOut, Video } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { adminApi } from '../../api/adminApi';
@@ -199,6 +199,21 @@ export default function AdminDashboardScreen() {
           <View style={styles.menuInfo}>
             <Text style={styles.menuTitle}>Nhật ký Hệ thống (Audit Log)</Text>
             <Text style={styles.menuSubtitle}>Theo dõi hành động của người dùng & quản trị viên</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => navigation.navigate('CameraDashboard')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.menuIconContainer, { backgroundColor: '#1e293b' }]}>
+            <Video size={24} color="#94a3b8" />
+          </View>
+          <View style={styles.menuInfo}>
+            <Text style={styles.menuTitle}>Giám sát Camera IoT</Text>
+            <Text style={styles.menuSubtitle}>Xem live stream từ ESP32-CAM và chụp ảnh hiện trường</Text>
           </View>
           <ChevronRight size={20} color={colors.gray[400]} />
         </TouchableOpacity>

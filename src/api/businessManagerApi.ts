@@ -64,32 +64,100 @@ export const businessManagerApi = {
 
   // Service Categories
   getAllCategories: (): Promise<ServiceCategoryDTO[]> =>
-    apiClient.get('/manager/service-categories').then(r => r.data),
+    apiClient.get('/manager/service-categories').then(r =>
+      (r.data as Array<Record<string, unknown>>).map(c => ({
+        id:          c.id as number | undefined,
+        name:        (c.categoryName ?? c.name) as string,
+        description: c.description as string | undefined,
+      } as ServiceCategoryDTO))
+    ),
 
   getCategoryById: (id: number): Promise<ServiceCategoryDTO> =>
-    apiClient.get(`/manager/service-categories/${id}`).then(r => r.data),
+    apiClient.get(`/manager/service-categories/${id}`).then(r => {
+      const c = r.data as Record<string, unknown>;
+      return { id: c.id as number | undefined, name: (c.categoryName ?? c.name) as string, description: c.description as string | undefined } as ServiceCategoryDTO;
+    }),
 
   createCategory: (data: ServiceCategoryDTO): Promise<ServiceCategoryDTO> =>
-    apiClient.post('/manager/service-categories', data).then(r => r.data),
+    apiClient.post('/manager/service-categories', {
+      categoryName: data.name,
+      description:  data.description,
+    }).then(r => {
+      const c = r.data as Record<string, unknown>;
+      return { id: c.id as number | undefined, name: (c.categoryName ?? c.name) as string, description: c.description as string | undefined } as ServiceCategoryDTO;
+    }),
 
   updateCategory: (id: number, data: ServiceCategoryDTO): Promise<ServiceCategoryDTO> =>
-    apiClient.put(`/manager/service-categories/${id}`, data).then(r => r.data),
+    apiClient.put(`/manager/service-categories/${id}`, {
+      categoryName: data.name,
+      description:  data.description,
+    }).then(r => {
+      const c = r.data as Record<string, unknown>;
+      return { id: c.id as number | undefined, name: (c.categoryName ?? c.name) as string, description: c.description as string | undefined } as ServiceCategoryDTO;
+    }),
 
   deleteCategory: (id: number): Promise<void> =>
     apiClient.delete(`/manager/service-categories/${id}`).then(r => r.data),
 
   // Service Types
   getAllServiceTypes: (): Promise<ServiceTypeDTO[]> =>
-    apiClient.get('/manager/service-types').then(r => r.data),
+    apiClient.get('/manager/service-types').then(r =>
+      (r.data as Array<Record<string, unknown>>).map(s => ({
+        id:                s.id as number | undefined,
+        name:              (s.serviceName ?? s.name) as string,
+        description:       s.description as string | undefined,
+        price:             Number(s.price),
+        serviceCategoryId: (s.categoryId ?? s.serviceCategoryId) as number,
+        serviceCategoryName: s.serviceCategoryName as string | undefined,
+      } as ServiceTypeDTO))
+    ),
 
   getServiceTypeById: (id: number): Promise<ServiceTypeDTO> =>
-    apiClient.get(`/manager/service-types/${id}`).then(r => r.data),
+    apiClient.get(`/manager/service-types/${id}`).then(r => {
+      const s = r.data as Record<string, unknown>;
+      return {
+        id:                s.id as number | undefined,
+        name:              (s.serviceName ?? s.name) as string,
+        description:       s.description as string | undefined,
+        price:             Number(s.price),
+        serviceCategoryId: (s.categoryId ?? s.serviceCategoryId) as number,
+        serviceCategoryName: s.serviceCategoryName as string | undefined,
+      } as ServiceTypeDTO;
+    }),
 
   createServiceType: (data: ServiceTypeDTO): Promise<ServiceTypeDTO> =>
-    apiClient.post('/manager/service-types', data).then(r => r.data),
+    apiClient.post('/manager/service-types', {
+      serviceName: data.name,
+      description: data.description,
+      price:       data.price,
+      categoryId:  data.serviceCategoryId,
+    }).then(r => {
+      const s = r.data as Record<string, unknown>;
+      return {
+        id:                s.id as number | undefined,
+        name:              (s.serviceName ?? s.name) as string,
+        description:       s.description as string | undefined,
+        price:             Number(s.price),
+        serviceCategoryId: (s.categoryId ?? s.serviceCategoryId) as number,
+      } as ServiceTypeDTO;
+    }),
 
   updateServiceType: (id: number, data: ServiceTypeDTO): Promise<ServiceTypeDTO> =>
-    apiClient.put(`/manager/service-types/${id}`, data).then(r => r.data),
+    apiClient.put(`/manager/service-types/${id}`, {
+      serviceName: data.name,
+      description: data.description,
+      price:       data.price,
+      categoryId:  data.serviceCategoryId,
+    }).then(r => {
+      const s = r.data as Record<string, unknown>;
+      return {
+        id:                s.id as number | undefined,
+        name:              (s.serviceName ?? s.name) as string,
+        description:       s.description as string | undefined,
+        price:             Number(s.price),
+        serviceCategoryId: (s.categoryId ?? s.serviceCategoryId) as number,
+      } as ServiceTypeDTO;
+    }),
 
   deleteServiceType: (id: number): Promise<void> =>
     apiClient.delete(`/manager/service-types/${id}`).then(r => r.data),

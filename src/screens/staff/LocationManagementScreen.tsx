@@ -24,7 +24,7 @@ export default function LocationManagementScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingLoc, setEditingLoc] = useState<LocationDTO | null>(null);
-  const [form, setForm] = useState({ name: '', address: '', description: '' });
+  const [form, setForm] = useState({ name: '', address: '', contactPhone: '', area: '', imageUrl: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchLocations = () => {
@@ -46,11 +46,13 @@ export default function LocationManagementScreen() {
       setForm({
         name: loc.name || '',
         address: loc.address || '',
-        description: loc.description || '',
+        contactPhone: loc.contactPhone || '',
+        area: loc.area ? String(loc.area) : '',
+        imageUrl: loc.imageUrl || '',
       });
     } else {
       setEditingLoc(null);
-      setForm({ name: '', address: '', description: '' });
+      setForm({ name: '', address: '', contactPhone: '', area: '', imageUrl: '' });
     }
     setModalVisible(true);
   };
@@ -60,18 +62,34 @@ export default function LocationManagementScreen() {
       Alert.alert('Lỗi', 'Vui lòng nhập Tên cơ sở và Địa chỉ!');
       return;
     }
+    const parsedArea = parseFloat(form.area);
+    if (isNaN(parsedArea) || parsedArea <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập Diện tích hợp lệ (số dương)!');
+      return;
+    }
     setIsSubmitting(true);
+
+    const payload: LocationDTO = {
+      name: form.name.trim(),
+      address: form.address.trim(),
+      contactPhone: form.contactPhone.trim() || undefined,
+      area: parsedArea,
+      imageUrl: form.imageUrl.trim() || undefined,
+      status: editingLoc?.status || 'ACTIVE',
+    };
+
     try {
       if (editingLoc && editingLoc.id) {
-        await businessManagerApi.updateLocation(editingLoc.id, form);
+        await businessManagerApi.updateLocation(editingLoc.id, payload);
         Alert.alert('Thành công', 'Đã cập nhật cơ sở!');
       } else {
-        await businessManagerApi.createLocation(form);
+        await businessManagerApi.createLocation(payload);
         Alert.alert('Thành công', 'Thêm cơ sở thành công!');
       }
       setModalVisible(false);
       fetchLocations();
-    } catch {
+    } catch (err: unknown) {
+      console.error(err);
       Alert.alert('Lỗi', 'Lưu thông tin cơ sở thất bại!');
     } finally {
       setIsSubmitting(false);
@@ -145,9 +163,12 @@ export default function LocationManagementScreen() {
                 <Text style={styles.address}>{item.address}</Text>
               </View>
 
-              {item.description ? (
-                <Text style={styles.desc}>{item.description}</Text>
-              ) : null}
+              <View style={styles.row}>
+                <Text style={styles.infoText}>📐 Diện tích: <Text style={{ fontWeight: '600' }}>{item.area} m²</Text></Text>
+                {item.contactPhone ? (
+                  <Text style={styles.infoText}>  •  📞 SĐT: <Text style={{ fontWeight: '600' }}>{item.contactPhone}</Text></Text>
+                ) : null}
+              </View>
             </View>
           )}
         />
@@ -181,14 +202,30 @@ export default function LocationManagementScreen() {
               onChangeText={(t) => setForm({ ...form, address: t })}
             />
 
-            <Text style={styles.label}>Mô tả</Text>
+            <Text style={styles.label}>Diện tích (m²) *</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Mô tả cơ sở..."
-              multiline
-              numberOfLines={3}
-              value={form.description}
-              onChangeText={(t) => setForm({ ...form, description: t })}
+              style={styles.input}
+              placeholder="VD: 150.5"
+              keyboardType="numeric"
+              value={form.area}
+              onChangeText={(t) => setForm({ ...form, area: t })}
+            />
+
+            <Text style={styles.label}>Số điện thoại liên hệ</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="VD: 0912345678"
+              keyboardType="phone-pad"
+              value={form.contactPhone}
+              onChangeText={(t) => setForm({ ...form, contactPhone: t })}
+            />
+
+            <Text style={styles.label}>Link ảnh cơ sở</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="http://..."
+              value={form.imageUrl}
+              onChangeText={(t) => setForm({ ...form, imageUrl: t })}
             />
 
             <View style={styles.modalFooter}>
@@ -248,9 +285,9 @@ const styles = StyleSheet.create({
   locName: { ...typography.heading2, color: colors.gray[900], flex: 1 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconBtn: { marginRight: spacing.xs },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   address: { ...typography.bodySmall, color: colors.gray[700] },
-  desc: { ...typography.caption, color: colors.gray[400], marginTop: spacing.xs },
+  infoText: { ...typography.caption, color: colors.gray[600], marginTop: 2 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg },
   modalContent: { backgroundColor: '#fff', borderRadius: radius.xl, padding: spacing.lg },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },

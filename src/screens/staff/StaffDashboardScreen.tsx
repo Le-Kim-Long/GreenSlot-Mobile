@@ -20,6 +20,9 @@ import {
   ClipboardList,
   ChevronRight,
   RefreshCw,
+  Sprout,
+  Calendar,
+  Package,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -211,11 +214,113 @@ export default function StaffDashboardScreen() {
           </View>
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Báo cáo Doanh thu</Text>
-
             <Text style={styles.menuDesc}>Biểu đồ doanh thu & phân tích hiệu suất khai thác</Text>
           </View>
           <ChevronRight size={20} color={colors.gray[400]} />
         </TouchableOpacity>
+
+        <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Quản lý Nông nghiệp</Text>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('TreeManagement')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: colors.green[50] }]}>
+            <Sprout size={22} color={colors.green[600]} />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Quản lý Giống cây</Text>
+            <Text style={styles.menuDesc}>Thêm, sửa giống cây & thiết lập ngưỡng IoT cảnh báo</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('EquipmentManagement')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: '#eff6ff' }]}>
+            <Package size={22} color="#2563eb" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Quản lý Thiết bị</Text>
+            <Text style={styles.menuDesc}>Theo dõi máy bơm, cảm biến IoT & lịch bảo trì</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('StaffScheduleManagement')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: '#fef3c7' }]}>
+            <Calendar size={22} color="#d97706" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Phân ca Nhân viên</Text>
+            <Text style={styles.menuDesc}>Lên lịch & điều phối ca làm việc cho nhân viên vườn</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('TreePlantingManagement')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: '#f0fdf4' }]}>
+            <ClipboardList size={22} color={colors.green[700]} />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Duyệt Yêu cầu Trồng cây</Text>
+            <Text style={styles.menuDesc}>Phê duyệt / từ chối yêu cầu thay giống cây từ khách hàng</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Phân Tích & Giám Sát</Text>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('AlertAnalytics')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: '#eff6ff' }]}>
+            <TrendingUp size={22} color="#2563eb" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Thống kê Cảnh báo IoT</Text>
+            <Text style={styles.menuDesc}>Phân tích mật độ & thời gian xử lý sự cố sensor</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('AlertHistory')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: '#fef2f2' }]}>
+            <ClipboardList size={22} color="#dc2626" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Lịch sử Cảnh báo</Text>
+            <Text style={styles.menuDesc}>Xem lại toàn bộ lịch sử cảnh báo & nhật ký xử lý</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('CustomerAnalytics')}
+        >
+          <View style={[styles.menuIconCircle, { backgroundColor: '#f5f3ff' }]}>
+            <Users size={22} color="#7c3aed" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Phân tích Khách hàng (CLV)</Text>
+            <Text style={styles.menuDesc}>Giá trị vòng đời khách hàng & chi tiêu dịch vụ</Text>
+          </View>
+          <ChevronRight size={20} color={colors.gray[400]} />
+        </TouchableOpacity>
+
       </ScrollView>
     </SafeAreaView>
   );

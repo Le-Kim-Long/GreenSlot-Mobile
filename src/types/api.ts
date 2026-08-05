@@ -190,13 +190,15 @@ export interface AlertProcessingLogDTO {
 
 export interface EquipmentDTO {
   id?: number;
-  name: string;
-  equipmentType: string;
+  equipmentName: string;
+  serialNumber: string;
+  description?: string;
   status: string;
   pillarId?: number;
   pillarCode?: string;
+  purchaseDate?: string;
   lastMaintenanceDate?: string;
-  notes?: string;
+  imageUrl?: string;
 }
 
 export interface NotificationResponseDTO {
@@ -214,54 +216,69 @@ export interface StaffScheduleDTO {
   staffName?: string;
   locationId: number;
   locationName?: string;
-  workDate: string;
-  shift: string;
+  scheduleDate: string;
+  startTime: string;
+  endTime: string;
   notes?: string;
+  isActive?: boolean;
 }
 
 export interface TreeDTO {
   id?: number;
-  name: string;
-  speciesName: string;
+  treeName: string;
+  scientificName: string;
   description?: string;
-  idealTempMin?: number;
-  idealTempMax?: number;
-  idealHumidityMin?: number;
-  idealHumidityMax?: number;
-  idealLightMin?: number;
-  idealLightMax?: number;
-  idealSoilMoistureMin?: number;
-  idealSoilMoistureMax?: number;
-  active?: boolean;
+  harvestDays?: number;
+  minRentalDays?: number;
+  price?: number;
+  imageUrl?: string;
+  soilMoistureMin?: number;
+  soilMoistureMax?: number;
+  lightMin?: number;
+  lightMax?: number;
+  phMin?: number;
+  phMax?: number;
+  compensationPercentage?: number;
+  careInstructions?: string;
+  isActive?: boolean;
 }
 
 export interface TreePlantingRequestCreateDTO {
-  slotId: number;
-  treeId: number;
+  rentalId: number;
+  newTreeId: number;
+  reason: string;
   notes?: string;
 }
 
 export interface TreePlantingRequestDTO {
   id: number;
-  slotId: number;
+  rentalId: number;
+  slotId?: number;            // alias used in older mapping
   slotNumber: string;
-  treeId: number;
-  treeName: string;
-  userName: string;
+  newTreeId: number;
+  newTreeName: string;
+  treeName?: string;          // alias for newTreeName (mobile display)
+  requestedById: number;
+  requestedByName: string;
+  userName?: string;          // alias for requestedByName (mobile display)
   status: string;
+  reason: string;
   notes?: string;
-  rejectReason?: string;
+  rejectReason?: string;      // populated by backend when status=REJECTED
   requestedAt: string;
-  approvedAt?: string;
-  completedAt?: string;
+  processedAt?: string;
+  processedById?: number;
+  processedByName?: string;
 }
 
 export interface LocationDTO {
   id?: number;
   name: string;
   address: string;
-  description?: string;
-  active?: boolean;
+  contactPhone?: string;
+  status?: string;
+  area: number;
+  imageUrl?: string;
 }
 
 export interface PillarDTO {
@@ -300,8 +317,10 @@ export interface ServiceTypeDTO {
 
 export interface ActiveRentalDTO {
   rentalId: number;
+  username?: string;
+  fullName?: string;
   slotNumber: string;
-  customerName: string;
+  pillarCode?: string;
   locationName: string;
   startTime: string;
   endTime: string;
@@ -379,6 +398,32 @@ export interface GlobalContentDTO {
   createdAt?: string;
 }
 
+export interface AlertAnalyticsDTO {
+  totalAlerts: number;
+  pendingAlerts: number;
+  resolvedAlerts: number;
+  criticalAlerts: number;
+  alertsByType: Record<string, number>;
+  alertsBySensorType: Record<string, number>;
+  averageResolutionTimeMinutes: number;
+  mostCommonAlertFrequency: number;
+  mostCommonAlertType: string;
+}
+
+export interface CustomerLifetimeValue {
+  userId: number;
+  userName: string;
+  userEmail: string;
+  totalSpent: number;
+  totalRentals: number;
+  averageRentalValue: number;
+  firstRentalDate: string | null;
+  lastRentalDate: string | null;
+  daysAsCustomer: number;
+  monthlyAverageSpend: number;
+  customerLifetimeValue: number;
+}
+
 // Backward-compatibility type aliases
 export type AvailableSlotDTO = AvailableSlotResponseDTO;
 
@@ -407,4 +452,5 @@ export type ServiceRequest = ServiceRequestDTO;
 export type BookingRequest = BookingRequestDTO;
 export type BookingResponse = BookingResponseDTO;
 export type ExtensionRequest = ExtensionRequestDTO;
+
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,76 +6,119 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, CheckCircle2, Info, AlertTriangle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { spacing, radius } from '../../theme/typography';
+import { notificationApi } from '../../api/notificationApi';
+import type { NotificationResponseDTO } from '../../types/api';
 
-interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  type: 'INFO' | 'SUCCESS' | 'WARNING';
-  read: boolean;
+function formatTime(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Hôm qua';
+    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+  } catch {
+    return isoString;
+  }
 }
-
-const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'Xác nhận Đặt slot thành công',
-    message: 'Bạn đã đăng ký thuê thành công ô Slot A-01 tại Cơ sở Nông nghiệp Xanh.',
-    time: '10 phút trước',
-    type: 'SUCCESS',
-    read: false,
-  },
-  {
-    id: '2',
-    title: 'Lịch tưới cây định kỳ',
-    message: 'Hệ thống tự động đã hoàn thành chu kỳ tưới nước lúc 07:00 AM.',
-    time: '2 giờ trước',
-    type: 'INFO',
-    read: false,
-  },
-  {
-    id: '3',
-    title: 'Nhắc nhở Gia hạn Hợp đồng',
-    message: 'Ô Slot B-04 của bạn còn 5 ngày nữa sẽ hết hạn hợp đồng thuê. Vui lòng gia hạn.',
-    time: '1 ngày trước',
-    type: 'WARNING',
-    read: true,
-  },
-];
 
 export default function CustomerNotificationsScreen() {
   const navigation = useNavigation();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
-  const [loading, setLoading] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationResponseDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const data = await notificationApi.getMyNotifications();
+      setNotifications(data);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications().finally(() => setLoading(false));
+  }, [fetchNotifications]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotifications();
+    setRefreshing(false);
   };
 
-  const renderItem = ({ item }: { item: NotificationItem }) => (
-    <View style={[styles.card, !item.read && styles.unreadCard]}>
-      <View style={styles.iconContainer}>
-        {item.type === 'SUCCESS' ? (
-          <CheckCircle2 size={22} color={colors.green[600]} />
-        ) : item.type === 'WARNING' ? (
-          <AlertTriangle size={22} color={colors.yellow[600]} />
-        ) : (
-          <Info size={22} color={colors.blue[600]} />
-        )}
-      </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.message}>{item.message}</Text>
-        <Text style={styles.time}>{item.time}</Text>
-      </View>
-    </View>
-  );
+  const handleMarkAsRead = async (id: number) => {
+    const item = notifications.find(n => n.id === id);
+    if (!item || item.isRead) return;
+
+    try {
+      await notificationApi.markAsRead(id);
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, isRead: true } : n))
+      );
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const unread = notifications.filter(n => !n.isRead);
+    if (unread.length === 0) return;
+
+    try {
+      await Promise.all(unread.map(n => notificationApi.markAsRead(n.id)));
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      Alert.alert('Thành công', 'Đã đánh dấu tất cả là đã đọc.');
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+      Alert.alert('Lỗi', 'Không thể đánh dấu đã đọc toàn bộ thông báo.');
+    }
+  };
+
+  const renderItem = ({ item }: { item: NotificationResponseDTO }) => {
+    const iconColor =
+      item.type === 'SUCCESS' || item.type === 'BOOKING_SUCCESS'
+        ? colors.green[600]
+        : item.type === 'WARNING' || item.type === 'IOT_ALERT'
+        ? colors.yellow[600]
+        : colors.blue[600];
+
+    return (
+      <TouchableOpacity
+        style={[styles.card, !item.isRead && styles.unreadCard]}
+        onPress={() => handleMarkAsRead(item.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.iconContainer}>
+          {item.type === 'SUCCESS' || item.type === 'BOOKING_SUCCESS' ? (
+            <CheckCircle2 size={22} color={iconColor} />
+          ) : item.type === 'WARNING' || item.type === 'IOT_ALERT' ? (
+            <AlertTriangle size={22} color={iconColor} />
+          ) : (
+            <Info size={22} color={iconColor} />
+          )}
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={[styles.title, !item.isRead && styles.unreadTitle]}>{item.title}</Text>
+          <Text style={styles.message}>{item.message}</Text>
+          <Text style={styles.time}>{formatTime(item.createdAt)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -89,18 +132,31 @@ export default function CustomerNotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={notifications}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Bell size={40} color={colors.gray[400]} />
-            <Text style={styles.emptyText}>Bạn chưa có thông báo nào.</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.green[600]} />
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={item => item.id.toString()}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.green[600]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Bell size={40} color={colors.gray[400]} />
+              <Text style={styles.emptyText}>Bạn chưa có thông báo nào.</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -133,6 +189,11 @@ const styles = StyleSheet.create({
     color: colors.green[600],
     fontWeight: '600',
   },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContent: {
     padding: spacing.md,
   },
@@ -146,7 +207,7 @@ const styles = StyleSheet.create({
     borderColor: colors.gray[200],
   },
   unreadCard: {
-    backgroundColor: colors.green[50] + '40',
+    backgroundColor: '#f0faf4',
     borderColor: colors.green[200],
   },
   iconContainer: {
@@ -158,9 +219,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
+    fontWeight: '500',
+    color: colors.gray[700],
+    marginBottom: 2,
+  },
+  unreadTitle: {
     fontWeight: '700',
     color: colors.gray[900],
-    marginBottom: 2,
   },
   message: {
     fontSize: 13,

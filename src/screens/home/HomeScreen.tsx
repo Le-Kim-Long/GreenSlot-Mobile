@@ -24,7 +24,6 @@ const steps = [
 
 export default function HomeScreen({ navigation }: CustomerTabProps<'Home'>) {
   const { user } = useAuth();
-  const parentNav = navigation.getParent();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -46,8 +45,9 @@ export default function HomeScreen({ navigation }: CustomerTabProps<'Home'>) {
               style={styles.featureCard}
               onPress={() => {
                 if (i === 0) navigation.navigate('Gardens');
-                else if (i === 1) parentNav?.navigate('IoTMonitoring');
-                else parentNav?.navigate('CareServices');
+                else if (i === 1) navigation.navigate('IoTMonitoring');
+                else navigation.navigate('CareServices');
+
               }}
             >
               <View style={[styles.featureIcon, { backgroundColor: f.bg }]}>

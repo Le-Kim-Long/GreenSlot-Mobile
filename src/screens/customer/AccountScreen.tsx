@@ -19,7 +19,6 @@ import type { CustomerTabProps } from '../../navigation/types';
 
 export default function AccountScreen({ navigation }: CustomerTabProps<'Account'>) {
   const { user, logout } = useAuth();
-  const parentNav = navigation.getParent();
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', screen: 'CustomerDashboard' as const },
@@ -58,7 +57,7 @@ export default function AccountScreen({ navigation }: CustomerTabProps<'Account'
           <TouchableOpacity
             key={i}
             style={styles.menuItem}
-            onPress={() => parentNav?.navigate(item.screen)}
+            onPress={() => navigation.navigate(item.screen)}
           >
             <View style={styles.menuIcon}>
               <item.icon size={20} color={colors.green[600]} />

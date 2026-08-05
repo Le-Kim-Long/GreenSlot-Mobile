@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
-import type { AvailableSlotDTO, BookingHistory } from '../types/api';
+import type { AvailableSlotDTO, BookingHistory, ActiveRentalDTO } from '../types/api';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -19,11 +19,13 @@ export type CustomerTabParamList = {
 export type CustomerStackParamList = {
   CustomerTabs: undefined;
   GardenDetail: { slot: AvailableSlotDTO };
+  RentalDetail: { rental: BookingHistory };
   IoTMonitoring: undefined;
   CareServices: undefined;
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
   Notifications: undefined;
+  CustomerTreePlanting: undefined;
 };
 
 export type GardenStaffTabParamList = {
@@ -37,6 +39,7 @@ export type GardenStaffStackParamList = {
   GardenStaffTabs: undefined;
   TaskDetail: { taskId: number };
   IoTMonitoring: undefined;
+  GardenStaffAlert: undefined;
 };
 
 export type StaffTabParamList = {
@@ -51,14 +54,25 @@ export type StaffStackParamList = {
   SlotManagement: undefined;
   ServiceManagement: undefined;
   ActiveRentals: undefined;
+  ActiveRentalDetail: { rental: ActiveRentalDTO };
   RevenueAnalytics: undefined;
+  TreeManagement: undefined;
+  EquipmentManagement: undefined;
+  StaffScheduleManagement: undefined;
+  TreePlantingManagement: undefined;
+  AlertAnalytics: undefined;
+  AlertHistory: undefined;
+  AlertProcessing: { alertId?: number };
+  CustomerAnalytics: undefined;
 };
+
 
 export type AdminStackParamList = {
   AdminDashboard: undefined;
   UserManagement: undefined;
   GlobalContent: undefined;
   AuditLog: undefined;
+  CameraDashboard: undefined;
 };
 
 export type RootStackParamList = {
@@ -85,4 +99,4 @@ export type CustomerStackProps<T extends keyof CustomerStackParamList> = NativeS
   T
 >;
 
-export type { BookingHistory };
+export type { BookingHistory, ActiveRentalDTO };

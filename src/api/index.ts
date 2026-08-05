@@ -13,3 +13,6 @@ export * from './staffScheduleApi';
 export * from './taskApi';
 export * from './treeApi';
 export * from './userApi';
+export * from './cameraApi';
+export * from './customerAnalyticsApi';
+

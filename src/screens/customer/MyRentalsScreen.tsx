@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,28 +7,35 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  ActivityIndicator,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
-import { Leaf } from 'lucide-react-native';
+import { Leaf, Clock, CreditCard, ChevronRight } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import type { BookingHistory } from '../../types/api';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
-import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerTabProps } from '../../navigation/types';
 
-type TabKey = 'ALL' | 'ACTIVE' | 'PENDING' | 'COMPLETED';
+type TabKey = 'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'COMPLETED';
 
 export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rentals'>) {
   const [rentals, setRentals] = useState<BookingHistory[]>([]);
   const [tab, setTab] = useState<TabKey>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [repayingId, setRepayingId] = useState<number | null>(null);
+
+  // Lưu rentalId đang chờ thanh toán để kiểm tra khi user quay về app
+  const pendingRepayRef = useRef<{ rentalId: number; prevStatus: string } | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const load = useCallback(async () => {
     try {
@@ -43,39 +50,110 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     load().finally(() => setLoading(false));
   }, [load]);
 
+  // Khi user quay lại app từ browser VNPay → kiểm tra kết quả thanh toán
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+      const wasBackground =
+        appStateRef.current === 'background' || appStateRef.current === 'inactive';
+      const nowActive = nextState === 'active';
+
+      if (wasBackground && nowActive && pendingRepayRef.current) {
+        const { rentalId, prevStatus } = pendingRepayRef.current;
+        pendingRepayRef.current = null;
+
+        // Reload danh sách để lấy trạng thái mới nhất
+        try {
+          const updated = await bookingApi.getHistory();
+          setRentals(updated);
+          const rental = updated.find(r => r.id === rentalId);
+          const newStatus = rental?.status ?? '';
+
+          if (newStatus === 'ACTIVE') {
+            Alert.alert(
+              '🎉 Thanh toán thành công!',
+              'Ô vườn của bạn đã được kích hoạt. Chúc bạn trồng trọt vui vẻ!',
+              [{ text: 'OK' }]
+            );
+          } else if (prevStatus === newStatus) {
+            // Trạng thái chưa thay đổi — có thể user chưa thanh toán hoặc đang xử lý
+            Alert.alert(
+              '⏳ Chưa ghi nhận thanh toán',
+              'Giao dịch chưa được xác nhận. Nếu bạn đã thanh toán, vui lòng chờ vài phút rồi kéo để làm mới.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert(
+              '❌ Thanh toán thất bại',
+              'Giao dịch không thành công hoặc bị hủy. Vui lòng thử lại.',
+              [{ text: 'OK' }]
+            );
+          }
+        } catch {
+          // Không làm gì nếu lỗi mạng
+        }
+      }
+
+      appStateRef.current = nextState;
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
   };
 
-  const filtered = tab === 'ALL' ? rentals : rentals.filter(r => r.status === tab);
+  // Đếm số đơn chờ thanh toán để hiện badge
+  const pendingPaymentCount = rentals.filter(
+    r => r.status === 'PENDING_PAYMENT' || r.status === 'PENDING'
+  ).length;
 
-  const handleExtend = (rental: BookingHistory) => {
-    Alert.alert('Gia hạn thuê', 'Chọn số tháng muốn gia hạn:', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: '1 tháng', onPress: () => doExtend(rental, 1) },
-      { text: '3 tháng', onPress: () => doExtend(rental, 3) },
-      { text: '6 tháng', onPress: () => doExtend(rental, 6) },
-    ]);
+  const filtered =
+    tab === 'ALL'
+      ? rentals
+      : tab === 'PENDING_PAYMENT'
+      ? rentals.filter(r => r.status === 'PENDING_PAYMENT' || r.status === 'PENDING')
+      : rentals.filter(r => r.status === tab);
+
+  // Tiếp tục thanh toán
+  const handleRepay = async (rental: BookingHistory) => {
+    Alert.alert(
+      'Tiếp tục thanh toán',
+      `Bạn có muốn tiếp tục thanh toán cho ô vườn ${rental.slotNumber}?\nTổng: ${formatCurrency(rental.totalPrice)}`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Thanh toán ngay',
+          onPress: () => doRepay(rental),
+        },
+      ]
+    );
   };
 
-  const doExtend = async (rental: BookingHistory, months: number) => {
+  const doRepay = async (rental: BookingHistory) => {
+    setRepayingId(rental.id);
     try {
-      const result = await bookingApi.extendBooking({ rentalId: rental.id, durationInMonths: months });
+      const result = await bookingApi.repayBooking(rental.id);
       if (result.paymentUrl) {
+        // Lưu thông tin rental đang chờ thanh toán để kiểm tra khi quay về
+        pendingRepayRef.current = { rentalId: rental.id, prevStatus: rental.status };
         await Linking.openURL(result.paymentUrl);
+      } else {
+        Alert.alert('Thông báo', 'Không tìm thấy link thanh toán. Vui lòng thử lại sau.');
       }
-      await load();
     } catch {
-      Alert.alert('Lỗi', 'Không thể gia hạn. Vui lòng thử lại.');
+      Alert.alert('Lỗi', 'Không thể lấy link thanh toán. Vui lòng thử lại.');
+    } finally {
+      setRepayingId(null);
     }
   };
 
-  const tabs: { key: TabKey; label: string }[] = [
+  const tabs: { key: TabKey; label: string; count?: number }[] = [
     { key: 'ALL', label: 'Tất cả' },
     { key: 'ACTIVE', label: 'Đang thuê' },
-    { key: 'PENDING', label: 'Chờ TT' },
+    { key: 'PENDING_PAYMENT', label: 'Chờ TT', count: pendingPaymentCount },
     { key: 'COMPLETED', label: 'Hoàn thành' },
   ];
 
@@ -85,8 +163,17 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Vườn đang thuê</Text>
+        {pendingPaymentCount > 0 && (
+          <View style={styles.pendingBanner}>
+            <Clock size={14} color={colors.orange[600] ?? '#ea580c'} />
+            <Text style={styles.pendingBannerText}>
+              Bạn có <Text style={styles.pendingBannerBold}>{pendingPaymentCount}</Text> đơn chờ thanh toán
+            </Text>
+          </View>
+        )}
       </View>
 
+      {/* Tab bar */}
       <View style={styles.tabs}>
         {tabs.map(t => (
           <TouchableOpacity
@@ -94,7 +181,16 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
             style={[styles.tab, tab === t.key && styles.tabActive]}
             onPress={() => setTab(t.key)}
           >
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>
+              {t.label}
+            </Text>
+            {(t.count ?? 0) > 0 && (
+              <View style={[styles.tabBadge, tab === t.key && styles.tabBadgeActive]}>
+                <Text style={[styles.tabBadgeText, tab === t.key && styles.tabBadgeTextActive]}>
+                  {t.count}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -103,7 +199,9 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         data={filtered}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green[600]} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green[600]} />
+        }
         ListEmptyComponent={
           <EmptyState
             title="Chưa có đơn thuê"
@@ -112,24 +210,70 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         }
         renderItem={({ item }) => {
           const badge = statusToBadge(item.status);
+          const isPendingPayment = item.status === 'PENDING_PAYMENT' || item.status === 'PENDING';
+          const isRepaying = repayingId === item.id;
+
           return (
-            <View style={styles.card}>
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.card, isPendingPayment && styles.cardPending]}
+              onPress={() => navigation.navigate('RentalDetail', { rental: item })}
+              activeOpacity={0.85}
+            >
+              {/* Pending payment warning bar */}
+              {isPendingPayment && (
+                <View style={styles.pendingBar}>
+                  <Clock size={13} color={colors.orange[600] ?? '#ea580c'} />
+                  <Text style={styles.pendingBarText}>Chờ thanh toán</Text>
+                </View>
+              )}
+
               <View style={styles.cardHeader}>
-                <View style={styles.cardIcon}>
-                  <Leaf size={22} color={colors.green[600]} />
+                <View style={[styles.cardIcon, isPendingPayment && styles.cardIconPending]}>
+                  <Leaf size={22} color={isPendingPayment ? (colors.orange[600] ?? '#ea580c') : colors.green[600]} />
                 </View>
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle}>{item.slotNumber}</Text>
                   <Text style={styles.cardSub}>{item.locationName}</Text>
-                  <Text style={styles.cardDate}>{item.startDate} — {item.endDate}</Text>
+                  {/* Full date range */}
+                  <View style={styles.dateRow}>
+                    <Text style={styles.cardDate}>📅 {item.startDate}</Text>
+                    <Text style={styles.dateSep}> → </Text>
+                    <Text style={styles.cardDate}>🏁 {item.endDate}</Text>
+                  </View>
                 </View>
                 <Badge label={badge.label} variant={badge.variant} />
               </View>
+
               <Text style={styles.cardPrice}>{formatCurrency(item.totalPrice)}</Text>
-              {item.status === 'ACTIVE' && (
-                <Button title="Gia hạn" onPress={() => handleExtend(item)} variant="outline" style={styles.extendBtn} />
+
+              {/* Tiếp tục thanh toán */}
+              {isPendingPayment && (
+                <TouchableOpacity
+                  style={[styles.repayBtn, isRepaying && styles.repayBtnDisabled]}
+                  onPress={(e) => { e.stopPropagation?.(); !isRepaying && handleRepay(item); }}
+                  activeOpacity={0.8}
+                  disabled={isRepaying}
+                >
+                  {isRepaying ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <CreditCard size={16} color={colors.white} />
+                  )}
+                  <Text style={styles.repayBtnText}>
+                    {isRepaying ? 'Đang xử lý...' : 'Tiếp tục thanh toán'}
+                  </Text>
+                </TouchableOpacity>
               )}
-            </View>
+
+              {/* Gia hạn hint */}
+              {item.status === 'ACTIVE' && (
+                <View style={styles.extendHint}>
+                  <ChevronRight size={14} color={colors.green[600]} />
+                  <Text style={styles.extendHintText}>Xem chi tiết & Gia hạn</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           );
         }}
       />
@@ -137,12 +281,40 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   );
 }
 
+const ORANGE = '#ea580c';
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   title: { ...typography.heading2, color: colors.gray[900] },
-  tabs: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
+
+  // Pending banner
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.xs,
+    backgroundColor: '#fff7ed',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  pendingBannerText: { ...typography.caption, color: ORANGE, flex: 1 },
+  pendingBannerBold: { fontWeight: '700', color: ORANGE },
+
+  // Tabs
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
   tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
@@ -153,7 +325,23 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.green[600], borderColor: colors.green[600] },
   tabText: { ...typography.caption, color: colors.gray[500], fontFamily: 'Inter_500Medium' },
   tabTextActive: { color: colors.white },
+  tabBadge: {
+    backgroundColor: ORANGE,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeActive: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  tabBadgeText: { fontSize: 10, fontWeight: '700', color: colors.white },
+  tabBadgeTextActive: { color: colors.white },
+
+  // List
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+
+  // Card
   card: {
     backgroundColor: colors.white,
     borderRadius: radius.lg,
@@ -161,7 +349,33 @@ const styles = StyleSheet.create({
     borderColor: colors.green[100],
     padding: spacing.lg,
     marginBottom: spacing.sm,
+    overflow: 'hidden',
   },
+  cardPending: {
+    borderColor: '#fed7aa',
+    borderWidth: 1.5,
+  },
+
+  // Pending bar (top strip)
+  pendingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#fff7ed',
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fed7aa',
+  },
+  pendingBarText: {
+    ...typography.caption,
+    color: ORANGE,
+    fontWeight: '600',
+  },
+
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.sm },
   cardIcon: {
     width: 44,
@@ -171,10 +385,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cardIconPending: { backgroundColor: '#fff7ed' },
   cardBody: { flex: 1 },
   cardTitle: { ...typography.label, color: colors.gray[900] },
   cardSub: { ...typography.caption, color: colors.gray[500] },
-  cardDate: { ...typography.caption, color: colors.gray[400], marginTop: 2 },
+
+  // Date row
+  dateRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 2 },
+  cardDate: { ...typography.caption, color: colors.gray[400] },
+  dateSep: { ...typography.caption, color: colors.gray[300] },
+
   cardPrice: { ...typography.label, color: colors.green[600], marginBottom: spacing.sm },
-  extendBtn: { marginTop: spacing.xs },
+
+  // Repay button
+  repayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: ORANGE,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    marginTop: spacing.xs,
+  },
+  repayBtnDisabled: { opacity: 0.6 },
+  repayBtnText: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: '700',
+  },
+
+  extendHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.sm,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.green[100],
+  },
+  extendHintText: {
+    ...typography.caption,
+    color: colors.green[600],
+    fontWeight: '600',
+  },
 });

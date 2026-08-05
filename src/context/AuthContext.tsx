@@ -4,6 +4,7 @@ import { authApi } from '../api/authApi';
 import { setStoredToken, clearStoredToken, setUnauthorizedHandler } from '../api/client';
 import type { User, UserRole } from '../types/api';
 import { mapBackendRolesToFrontend } from '../utils/roleMap';
+import { registerForPushNotificationsAsync } from '../utils/notificationHelper';
 
 const USER_KEY = 'greenslot_user';
 
@@ -44,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
   }, [logout]);
+
+  useEffect(() => {
+    if (user) {
+      // Register Firebase device token when user is logged in
+      registerForPushNotificationsAsync().catch((err) => {
+        console.warn('Failed to register device token automatically:', err);
+      });
+    }
+  }, [user]);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {

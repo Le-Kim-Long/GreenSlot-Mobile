@@ -11,13 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, FileCheck, Calendar, User, Grid } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { businessManagerApi } from '../../api/businessManagerApi';
 import { colors } from '../../theme/colors';
 import { spacing, radius } from '../../theme/typography';
-import type { ActiveRentalDTO } from '../../types/api';
+import type { ActiveRentalDTO, StaffStackParamList } from '../../navigation/types';
 
 export default function ActiveRentalsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<StaffStackParamList>>();
   const [rentals, setRentals] = useState<ActiveRentalDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +39,11 @@ export default function ActiveRentalsScreen() {
   }, []);
 
   const renderRentalItem = ({ item }: { item: ActiveRentalDTO }) => (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate('ActiveRentalDetail', { rental: item })}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.titleRow}>
           <Grid size={18} color={colors.green[600]} />
@@ -55,7 +60,7 @@ export default function ActiveRentalsScreen() {
         <View style={styles.infoRow}>
           <User size={14} color={colors.gray[500]} />
           <Text style={styles.infoText}>
-            Khách hàng: <Text style={styles.boldText}>{item.customerName || 'Chưa cập nhật'}</Text>
+            Khách hàng: <Text style={styles.boldText}>{item.fullName || item.username || 'Chưa có thông tin'}</Text>
           </Text>
         </View>
 
@@ -66,7 +71,7 @@ export default function ActiveRentalsScreen() {
           </Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

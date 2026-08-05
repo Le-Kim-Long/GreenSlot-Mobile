@@ -15,6 +15,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { LoadingScreen } from './src/components/ui/LoadingScreen';
+import { setupNotificationListeners } from './src/utils/notificationHelper';
+import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +29,22 @@ export default function App() {
     Inter_700Bold,
     Inter_800ExtraBold,
   });
+
+  useEffect(() => {
+    // Listeners for receiving and interacting with notifications
+    const removeListeners = setupNotificationListeners(
+      (notification) => {
+        console.log('Notification received in foreground:', notification);
+      },
+      (response) => {
+        console.log('User interacted with notification:', response);
+      }
+    );
+
+    return () => {
+      removeListeners();
+    };
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
