@@ -18,7 +18,7 @@ import AlertAnalyticsScreen from '../screens/staff/AlertAnalyticsScreen';
 import AlertHistoryScreen from '../screens/staff/AlertHistoryScreen';
 import AlertProcessingScreen from '../screens/staff/AlertProcessingScreen';
 import CustomerAnalyticsScreen from '../screens/staff/CustomerAnalyticsScreen';
-import AccountScreen from '../screens/customer/AccountScreen';
+import ManagerAccountScreen from '../screens/staff/ManagerAccountScreen';
 import { colors } from '../theme/colors';
 import type { StaffTabParamList, StaffStackParamList } from './types';
 
@@ -49,7 +49,7 @@ function StaffTabNavigator() {
       />
       <Tab.Screen
         name="Account"
-        component={AccountScreen}
+        component={ManagerAccountScreen}
         options={{
           tabBarLabel: 'Tài khoản',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,

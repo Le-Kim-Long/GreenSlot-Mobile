@@ -12,13 +12,15 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sprout, Search, Calendar, ChevronRight, X, User, MapPin, CheckCircle, XCircle } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Sprout, Search, Calendar, ChevronRight, X, User, MapPin, CheckCircle, XCircle, ArrowLeft } from 'lucide-react-native';
 import { treePlantingApi } from '../../api/treeApi';
 import type { TreePlantingRequestDTO } from '../../types/api';
 import { colors } from '../../theme/colors';
 import { spacing, radius } from '../../theme/typography';
 
 export default function TreePlantingManagementScreen() {
+  const navigation = useNavigation<any>();
   const [requests, setRequests] = useState<TreePlantingRequestDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -114,7 +116,16 @@ export default function TreePlantingManagementScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Yêu cầu Trồng cây</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       {/* Search Header */}
       <View style={styles.header}>
         <View style={styles.searchBar}>
@@ -527,5 +538,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#dc2626',
     marginTop: 4,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

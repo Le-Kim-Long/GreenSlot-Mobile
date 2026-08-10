@@ -67,12 +67,19 @@ export type StaffStackParamList = {
 };
 
 
+export type AdminTabParamList = {
+  AdminDashboard: undefined;
+  AdminAccount: undefined;
+};
+
 export type AdminStackParamList = {
+  AdminTabs: undefined;
   AdminDashboard: undefined;
   UserManagement: undefined;
   GlobalContent: undefined;
   AuditLog: undefined;
   CameraDashboard: undefined;
+  AdminAccount: undefined;
 };
 
 export type RootStackParamList = {
@@ -96,6 +103,36 @@ export type CustomerTabProps<T extends keyof CustomerTabParamList> = CompositeSc
 
 export type CustomerStackProps<T extends keyof CustomerStackParamList> = NativeStackScreenProps<
   CustomerStackParamList,
+  T
+>;
+
+export type GardenStaffTabProps<T extends keyof GardenStaffTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<GardenStaffTabParamList, T>,
+  NativeStackScreenProps<GardenStaffStackParamList>
+>;
+
+export type GardenStaffStackProps<T extends keyof GardenStaffStackParamList> = NativeStackScreenProps<
+  GardenStaffStackParamList,
+  T
+>;
+
+export type StaffTabProps<T extends keyof StaffTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<StaffTabParamList, T>,
+  NativeStackScreenProps<StaffStackParamList>
+>;
+
+export type StaffStackProps<T extends keyof StaffStackParamList> = NativeStackScreenProps<
+  StaffStackParamList,
+  T
+>;
+
+export type AdminTabProps<T extends keyof AdminTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<AdminTabParamList, T>,
+  NativeStackScreenProps<AdminStackParamList>
+>;
+
+export type AdminStackProps<T extends keyof AdminStackParamList> = NativeStackScreenProps<
+  AdminStackParamList,
   T
 >;
 

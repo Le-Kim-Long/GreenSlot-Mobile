@@ -49,6 +49,10 @@ export default function RevenueAnalyticsScreen() {
     fetchAnalytics();
   }, []);
 
+  const totalTx = analytics?.totalTransactions ?? analytics?.transactions?.length ?? 0;
+  const successfulTx = analytics?.successfulTransactions ?? analytics?.transactions?.length ?? 0;
+  const failedTx = analytics?.failedTransactions ?? 0;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -88,7 +92,7 @@ export default function RevenueAnalyticsScreen() {
         <View style={styles.metricsCard}>
           <View style={styles.metricRow}>
             <Text style={styles.metricLabel}>Tổng số giao dịch:</Text>
-            <Text style={styles.metricValue}>{analytics?.totalTransactions || 0}</Text>
+            <Text style={styles.metricValue}>{totalTx}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -96,7 +100,7 @@ export default function RevenueAnalyticsScreen() {
           <View style={styles.metricRow}>
             <Text style={styles.metricLabel}>Giao dịch thành công:</Text>
             <Text style={[styles.metricValue, { color: colors.green[600] }]}>
-              {analytics?.successfulTransactions || 0}
+              {successfulTx}
             </Text>
           </View>
 
@@ -105,7 +109,7 @@ export default function RevenueAnalyticsScreen() {
           <View style={styles.metricRow}>
             <Text style={styles.metricLabel}>Giao dịch thất bại / hủy:</Text>
             <Text style={[styles.metricValue, { color: colors.red[600] }]}>
-              {analytics?.failedTransactions || 0}
+              {failedTx}
             </Text>
           </View>
         </View>

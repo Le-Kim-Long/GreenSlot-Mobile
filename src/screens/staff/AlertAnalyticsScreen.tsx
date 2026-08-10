@@ -4,15 +4,19 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { BellRing, AlertCircle, CheckCircle, Clock } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { BellRing, AlertCircle, CheckCircle, Clock, ArrowLeft } from 'lucide-react-native';
 import { alertApi } from '../../api/alertApi';
 import type { AlertAnalyticsDTO } from '../../types/api';
 import { colors } from '../../theme/colors';
 
 export default function AlertAnalyticsScreen() {
+  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [analytics, setAnalytics] = useState<AlertAnalyticsDTO | null>(null);
@@ -62,14 +66,23 @@ export default function AlertAnalyticsScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Thống kê Cảnh báo IoT</Text>
-        <Text style={styles.subtitle}>Thống kê tổng quan trong 30 ngày qua</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Thống kê Cảnh báo IoT</Text>
+        <View style={{ width: 36 }} />
       </View>
+
+      <ScrollView
+        style={styles.container}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>Thống kê tổng quan trong 30 ngày qua</Text>
+        </View>
 
       <View style={styles.grid}>
         <View style={[styles.card, { backgroundColor: '#EFF6FF' }]}>
@@ -117,10 +130,12 @@ export default function AlertAnalyticsScreen() {
         )}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
   container: { flex: 1, backgroundColor: '#F9FAFB', padding: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { marginBottom: 20 },
@@ -148,4 +163,27 @@ const styles = StyleSheet.create({
   listKey: { fontSize: 14, color: colors.gray[700], fontWeight: '500' },
   listVal: { fontSize: 14, color: colors.green[600], fontWeight: 'bold' },
   emptyText: { fontSize: 14, color: colors.gray[400], textAlign: 'center', marginVertical: 12 },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

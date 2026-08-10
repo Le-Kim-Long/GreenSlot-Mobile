@@ -338,11 +338,12 @@ export interface DashboardMetricsDTO {
 
 export interface RevenueAnalyticsResponseDTO {
   totalRevenue: number;
-  totalTransactions: number;
-  successfulTransactions: number;
-  failedTransactions: number;
-  periodStart: string;
-  periodEnd: string;
+  totalTransactions?: number;
+  successfulTransactions?: number;
+  failedTransactions?: number;
+  periodStart?: string;
+  periodEnd?: string;
+  transactions?: any[];
 }
 
 export interface RevenueByLocationDTO {

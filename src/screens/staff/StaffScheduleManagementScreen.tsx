@@ -13,7 +13,8 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar as CalendarIcon, Plus, Edit2, Trash2, X, Clock, MapPin, User, Search } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Calendar as CalendarIcon, Plus, Edit2, Trash2, X, Clock, MapPin, User, Search, ArrowLeft } from 'lucide-react-native';
 import { staffScheduleApi } from '../../api/staffScheduleApi';
 import { businessManagerApi } from '../../api/businessManagerApi';
 import type { StaffScheduleDTO, LocationDTO, UserAdminDTO } from '../../types/api';
@@ -33,6 +34,7 @@ const emptyForm: Partial<StaffScheduleDTO> = {
 };
 
 export default function StaffScheduleManagementScreen() {
+  const navigation = useNavigation<any>();
   const [schedules, setSchedules] = useState<StaffScheduleDTO[]>([]);
   const [locations, setLocations] = useState<LocationDTO[]>([]);
   const [staffs, setStaffs] = useState<UserAdminDTO[]>([]);
@@ -164,7 +166,16 @@ export default function StaffScheduleManagementScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Phân ca Trực</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       {/* Search Header */}
       <View style={styles.header}>
         <View style={styles.searchBar}>
@@ -714,5 +725,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.gray[500],
     marginTop: 2,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -6,7 +6,7 @@ import { colors } from '../theme/colors';
 import GardenStaffDashboardScreen from '../screens/garden-staff/GardenStaffDashboardScreen';
 import TaskManagementScreen from '../screens/staff/TaskManagementScreen';
 import StaffListScreen from '../screens/staff/StaffListScreen';
-import AccountScreen from '../screens/customer/AccountScreen';
+import GardenStaffAccountScreen from '../screens/garden-staff/GardenStaffAccountScreen';
 import IoTMonitoringScreen from '../screens/customer/IoTMonitoringScreen';
 import type { GardenStaffTabParamList, GardenStaffStackParamList } from './types';
 import GardenStaffAlertScreen from '@/screens/garden-staff/GardenStaffAlertScreen';
@@ -54,7 +54,7 @@ function GardenStaffTabNavigator() {
       />
       <Tab.Screen
         name="Account"
-        component={AccountScreen}
+        component={GardenStaffAccountScreen}
         options={{
           tabBarLabel: 'Tài khoản',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,

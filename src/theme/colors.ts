@@ -52,7 +52,9 @@ export const colors = {
   },
   red: {
     100: '#fee2e2',
+    500: '#ef4444',
     600: '#dc2626',
+    700: '#b91c1c',
     800: '#991b1b',
   },
   blue: {

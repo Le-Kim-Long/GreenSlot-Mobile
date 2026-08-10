@@ -13,7 +13,8 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Plus, Edit2, Trash2, X, Wrench, Layers, Calendar, ShieldCheck, Hash } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Search, Plus, Edit2, Trash2, X, Wrench, Layers, Calendar, ShieldCheck, Hash, ArrowLeft } from 'lucide-react-native';
 import { equipmentApi } from '../../api/equipmentApi';
 import { businessManagerApi } from '../../api/businessManagerApi';
 import type { EquipmentDTO, PillarDTO } from '../../types/api';
@@ -33,6 +34,7 @@ const emptyForm: Partial<EquipmentDTO> = {
 };
 
 export default function EquipmentManagementScreen() {
+  const navigation = useNavigation<any>();
   const [equipments, setEquipments] = useState<EquipmentDTO[]>([]);
   const [pillars, setPillars] = useState<PillarDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,7 +152,16 @@ export default function EquipmentManagementScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Quản lý Thiết bị</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       {/* Search & Add btn */}
       <View style={styles.header}>
         <View style={styles.searchBar}>
@@ -700,5 +711,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.gray[500],
     marginTop: 2,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

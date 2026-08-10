@@ -4,7 +4,7 @@ import { colors } from '../theme/colors';
 import HomeScreen from '../screens/home/HomeScreen';
 import GardenListScreen from '../screens/gardens/GardenListScreen';
 import MyRentalsScreen from '../screens/customer/MyRentalsScreen';
-import AccountScreen from '../screens/customer/AccountScreen';
+import CustomerAccountScreen from '../screens/customer/CustomerAccountScreen';
 import type { CustomerTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
@@ -51,7 +51,7 @@ export function CustomerTabs() {
       />
       <Tab.Screen
         name="Account"
-        component={AccountScreen}
+        component={CustomerAccountScreen}
         options={{
           tabBarLabel: 'Tài khoản',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,

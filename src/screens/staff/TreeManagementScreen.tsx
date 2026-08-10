@@ -14,7 +14,8 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Plus, Edit2, Trash2, X, AlertTriangle, Droplets, Sun, Activity, DollarSign, Clock } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Search, Plus, Edit2, Trash2, X, AlertTriangle, Droplets, Sun, Activity, DollarSign, Clock, ArrowLeft } from 'lucide-react-native';
 import { treeApi } from '../../api/treeApi';
 import type { TreeDTO } from '../../types/api';
 import { colors } from '../../theme/colors';
@@ -40,6 +41,7 @@ const emptyForm: Partial<TreeDTO> = {
 };
 
 export default function TreeManagementScreen() {
+  const navigation = useNavigation<any>();
   const [trees, setTrees] = useState<TreeDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -142,7 +144,16 @@ export default function TreeManagementScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Quản lý Giống Cây</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       {/* Control Panel */}
       <View style={styles.header}>
         <View style={styles.searchBar}>
@@ -718,5 +729,28 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '600',
     fontSize: 15,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

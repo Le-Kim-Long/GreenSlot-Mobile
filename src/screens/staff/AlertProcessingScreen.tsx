@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { ArrowLeft } from 'lucide-react-native';
 import { alertApi } from '../../api/alertApi';
 import { colors } from '../../theme/colors';
 
@@ -47,8 +49,17 @@ export default function AlertProcessingScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Xử Lý Cảnh Báo #{alertId || 'Chung'}</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtnHeader} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Xử Lý Cảnh Báo #{alertId || 'Chung'}</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <ScrollView style={styles.container}>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Trạng thái xử lý</Text>
@@ -102,13 +113,14 @@ export default function AlertProcessingScreen() {
           <Text style={styles.submitBtnText}>Xác nhận Xử lý</Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
   container: { flex: 1, backgroundColor: '#F9FAFB', padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', color: colors.gray[900], marginBottom: 20 },
   formGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '600', color: colors.gray[700], marginBottom: 8 },
   statusRow: { flexDirection: 'row', gap: 8 },
@@ -141,5 +153,28 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   submitBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtnHeader: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 

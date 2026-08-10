@@ -8,12 +8,15 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
-import { AlertTriangle } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { AlertTriangle, ArrowLeft } from 'lucide-react-native';
 import { alertApi } from '../../api/alertApi';
 import type { AlertDTO } from '../../types/api';
 import { colors } from '../../theme/colors';
 
 export default function AlertHistoryScreen() {
+  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [alerts, setAlerts] = useState<AlertDTO[]>([]);
@@ -81,8 +84,17 @@ export default function AlertHistoryScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Lịch sử Cảnh báo</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Back Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.gray[900]} />
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>Lịch sử Cảnh báo</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={[styles.container, { paddingTop: 12 }]}>
 
       {/* Filter Tabs */}
       <View style={styles.filterRow}>
@@ -112,11 +124,13 @@ export default function AlertHistoryScreen() {
           }
         />
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
   container: { flex: 1, backgroundColor: '#F9FAFB', padding: 16 },
   title: { fontSize: 22, fontWeight: 'bold', color: colors.gray[900], marginBottom: 12 },
   filterRow: { flexDirection: 'row', marginBottom: 16 },
@@ -149,5 +163,28 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 12, color: colors.gray[500] },
   dateText: { fontSize: 12, color: colors.gray[400] },
   emptyText: { textAlign: 'center', marginTop: 40, color: colors.gray[400] },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
