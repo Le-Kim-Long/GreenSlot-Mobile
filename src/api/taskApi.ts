@@ -42,6 +42,16 @@ export const taskApi = {
 
   reportIssue: (taskId: number, data: IssueReportRequestDTO): Promise<GardeningTaskResponseDTO> =>
     apiClient.post(`/tasks/${taskId}/report-issue`, data).then(r => r.data),
+
+  uploadEvidenceImage: (file: any): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post('/images/upload/evidence', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then(r => r.data.publicUrl);
+  },
 };
 
 export const managerApi = {
