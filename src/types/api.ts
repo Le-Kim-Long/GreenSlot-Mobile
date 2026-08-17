@@ -206,9 +206,12 @@ export interface EquipmentDTO {
 
 export interface NotificationResponseDTO {
   id: number;
+  userId?: number;
   title: string;
   message: string;
   type: string;
+  referenceId?: number | null;
+  actionUrl?: string | null;
   isRead: boolean;
   createdAt: string;
 }

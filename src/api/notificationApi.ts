@@ -11,6 +11,12 @@ export const notificationApi = {
   getMyNotifications: (): Promise<NotificationResponseDTO[]> =>
     apiClient.get<NotificationResponseDTO[]>('/notifications').then(r => r.data),
 
+  getUnreadCount: (): Promise<{ unreadCount: number }> =>
+    apiClient.get<{ unreadCount: number }>('/notifications/unread-count').then(r => r.data),
+
   markAsRead: (id: number): Promise<NotificationResponseDTO> =>
     apiClient.put<NotificationResponseDTO>(`/notifications/${id}/read`).then(r => r.data),
+
+  markAllAsRead: (): Promise<{ message: string; updatedCount?: number }> =>
+    apiClient.put<{ message: string; updatedCount?: number }>('/notifications/read-all').then(r => r.data),
 };

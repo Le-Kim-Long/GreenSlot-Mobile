@@ -1,6 +1,8 @@
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Leaf, Wifi, Wrench, ArrowRight, Sprout, Droplets, Sun } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Leaf, Wifi, Wrench, ArrowRight, Sprout, Droplets, Sun, Bell } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Logo } from '../../components/common/Logo';
 import { GradientHeader } from '../../components/common/GradientHeader';
@@ -8,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerTabProps } from '../../navigation/types';
+import { notificationApi } from '../../api/notificationApi';
 
 const features = [
   { icon: Leaf, title: 'Thuê ô vườn', desc: 'Chọn vị trí phù hợp', color: colors.green[600], bg: colors.green[50] },
@@ -24,12 +27,57 @@ const steps = [
 
 export default function HomeScreen({ navigation }: CustomerTabProps<'Home'>) {
   const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const fetchUnread = async () => {
+        try {
+          const res = await notificationApi.getUnreadCount();
+          if (isMounted && typeof res?.unreadCount === 'number') {
+            setUnreadCount(res.unreadCount);
+          }
+        } catch {
+          try {
+            const list = await notificationApi.getMyNotifications();
+            if (isMounted && Array.isArray(list)) {
+              setUnreadCount(list.filter(n => !n.isRead).length);
+            }
+          } catch {
+            // ignore
+          }
+        }
+      };
+
+      void fetchUnread();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Logo size="sm" />
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => navigation.navigate('Notifications')}
+            activeOpacity={0.7}
+            accessibilityLabel="Thông báo"
+          >
+            <Bell size={20} color={colors.gray[700]} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <GradientHeader
@@ -47,7 +95,6 @@ export default function HomeScreen({ navigation }: CustomerTabProps<'Home'>) {
                 if (i === 0) navigation.navigate('Gardens');
                 else if (i === 1) navigation.navigate('IoTMonitoring');
                 else navigation.navigate('CareServices');
-
               }}
             >
               <View style={[styles.featureIcon, { backgroundColor: f.bg }]}>
@@ -87,7 +134,43 @@ export default function HomeScreen({ navigation }: CustomerTabProps<'Home'>) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  header: { marginBottom: spacing.lg },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.green[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: colors.red[500],
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    color: colors.white,
+    textAlign: 'center',
+  },
   sectionTitle: { ...typography.heading3, color: colors.gray[900], marginBottom: spacing.md },
   featureGrid: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   featureCard: {
