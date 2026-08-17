@@ -1,4 +1,5 @@
 import type { BookingHistory, RentalHistoryDTO } from '../types/api';
+import { resolveSlotId } from './slotCache';
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '-';
@@ -8,10 +9,25 @@ function formatDate(iso: string | undefined): string {
 export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
   const paidTx = dto.transactions?.find(t => t.status === 'SUCCESS' || t.status === 'PAID');
   const latestTx = dto.transactions?.[0];
-  const totalPrice = dto.transactions?.reduce((sum, t) => sum + (Number(t.amount) || 0), 0) ?? 0;
+
+  // Chỉ cộng tổng các giao dịch đã thành công
+  const paidTransactions = dto.transactions?.filter(t => t.status === 'SUCCESS' || t.status === 'PAID') ?? [];
+  const totalPrice = paidTransactions.length > 0
+    ? paidTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+    : (Number(latestTx?.amount) || 0);
+
+  // Detect EXPIRED từ phía client nếu backend vẫn trả ACTIVE
+  let computedStatus = dto.rentalStatus;
+  if (computedStatus === 'ACTIVE' && dto.endTime) {
+    if (new Date(dto.endTime) < new Date()) {
+      computedStatus = 'EXPIRED';
+    }
+  }
 
   return {
     id: dto.rentalId,
+    // Resolve slotId từ cache — backend /bookings/history không trả slotId
+    slotId: resolveSlotId(dto.slotNumber, dto.rentalId),
     slotNumber: dto.slotNumber,
     pillarCode: dto.pillarCode,
     locationName: dto.locationName,
@@ -21,7 +37,7 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     startTime: dto.startTime,
     endTime: dto.endTime,
     totalPrice,
-    status: dto.rentalStatus,
+    status: computedStatus,
     paymentStatus: paidTx?.status || latestTx?.status,
     transactions: dto.transactions ?? [],
   };

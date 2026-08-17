@@ -16,6 +16,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { LoadingScreen } from './src/components/ui/LoadingScreen';
 import { setupNotificationListeners } from './src/utils/notificationHelper';
+import { initSlotCache } from './src/utils/slotCache';
 import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync();
@@ -31,6 +32,9 @@ export default function App() {
   });
 
   useEffect(() => {
+    // Khởi tạo slot ID cache từ AsyncStorage vào bộ nhớ RAM
+    initSlotCache().catch(() => { });
+
     // Listeners for receiving and interacting with notifications
     const removeListeners = setupNotificationListeners(
       (notification) => {

@@ -3,14 +3,24 @@ import type { AlertDTO, AlertAnalyticsDTO, AlertProcessingLogDTO } from '../type
 
 export interface ProcessAlertPayload {
   alertId?: number;
-  status: string; // 'RESOLVED' | 'PENDING' | 'IGNORED'
-  comment: string;
+  status: string; // 'RESOLVED' | 'PENDING' | 'IGNORED' | 'ESCALATED'
+  comment?: string;
   evidenceImageUrl?: string;
+  actionsTaken?: string; // API Docs §7.2
+  notes?: string; // API Docs §7.2
 }
 
 export const alertApi = {
   processAlert: async (data: ProcessAlertPayload): Promise<any> => {
     const response = await apiClient.post('/alerts/process', data);
+    return response.data;
+  },
+
+  /** Escalates alert to location manager/manager — API Docs §7.3 */
+  escalateAlert: async (alertId: number, escalateToUserId: number, reason: string): Promise<any> => {
+    const response = await apiClient.post(`/alerts/${alertId}/escalate`, null, {
+      params: { escalateToUserId, reason }
+    });
     return response.data;
   },
 

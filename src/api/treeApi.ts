@@ -45,4 +45,12 @@ export const treePlantingApi = {
 
   completeRequest: (id: number): Promise<TreePlantingRequestDTO> =>
     apiClient.post(`/tree-planting/${id}/complete`).then(r => r.data),
+
+  /** Lấy tất cả yêu cầu cho Staff/Manager — API Docs §3.3 */
+  getAllRequestsForStaff: (): Promise<TreePlantingRequestDTO[]> =>
+    apiClient.get('/tree-planting/requests').then(r => r.data),
+
+  /** Xử lý yêu cầu duyệt trồng cây — API Docs §3.4 */
+  processRequest: (data: { requestId: number; status: 'APPROVED' | 'REJECTED'; processNotes?: string }): Promise<TreePlantingRequestDTO> =>
+    apiClient.post('/tree-planting/process', data).then(r => r.data),
 };

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { managerApi, taskApi } from '../../api/taskApi';
-import type { BookingHistory, ServiceType } from '../../types/api';
+import type { BookingHistory, ServiceType, GardeningTaskResponseDTO } from '../../types/api';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
+import { Badge, statusToBadge } from '../../components/ui/Badge';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
@@ -14,23 +15,34 @@ import { typography, spacing, radius } from '../../theme/typography';
 export default function CareServicesScreen() {
   const [rentals, setRentals] = useState<BookingHistory[]>([]);
   const [services, setServices] = useState<ServiceType[]>([]);
+  const [requests, setRequests] = useState<GardeningTaskResponseDTO[]>([]);
   const [selectedRental, setSelectedRental] = useState<number | null>(null);
   const [selectedService, setSelectedService] = useState<number | null>(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      bookingApi.getHistory().catch(() => []),
-      managerApi.getServiceTypes().catch(() => []),
-    ]).then(([history, types]) => {
+  const loadData = async () => {
+    try {
+      const [history, types, reqs] = await Promise.all([
+        bookingApi.getHistory().catch(() => []),
+        managerApi.getServiceTypes().catch(() => []),
+        taskApi.getMyServiceRequests().catch(() => []),
+      ]);
       const active = history.filter(r => r.status === 'ACTIVE');
       setRentals(active);
       setServices(types);
-      if (active.length) setSelectedRental(active[0].id);
-      if (types.length && types[0].id != null) setSelectedService(types[0].id);
-    }).finally(() => setLoading(false));
+      setRequests(reqs);
+      
+      if (active.length && selectedRental === null) setSelectedRental(active[0].id);
+      if (types.length && types[0].id != null && selectedService === null) setSelectedService(types[0].id);
+    } catch (e) {
+      console.warn('Failed to load care services data:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadData().finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = async () => {
@@ -46,8 +58,10 @@ export default function CareServicesScreen() {
         serviceTypeId: selectedService,
         description: description.trim() || undefined,
       });
-      Alert.alert('Thành công', 'Yêu cầu dịch vụ đã được gửi!');
+      Alert.alert('Thành công', 'Yêu cầu dịch vụ chăm sóc đã được gửi!');
       setDescription('');
+      // Tải lại danh sách yêu cầu dịch vụ
+      loadData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể gửi yêu cầu.');
@@ -94,7 +108,6 @@ export default function CareServicesScreen() {
         ))}
       </Card>
 
-
       <Input
         label="Mô tả thêm (tuỳ chọn)"
         value={description}
@@ -106,6 +119,40 @@ export default function CareServicesScreen() {
       />
 
       <Button title="Gửi yêu cầu" onPress={handleSubmit} loading={submitting} disabled={!rentals.length} />
+
+      {/* Danh sách yêu cầu dịch vụ đã gửi */}
+      <Text style={[styles.label, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>Yêu cầu đã gửi</Text>
+      {requests.length === 0 ? (
+        <Card style={{ padding: spacing.md, alignItems: 'center' }}>
+          <Text style={styles.empty}>Bạn chưa gửi yêu cầu dịch vụ nào.</Text>
+        </Card>
+      ) : (
+        requests.map((req) => {
+          const badgeInfo = statusToBadge(req.status);
+          return (
+            <Card key={req.id} style={styles.requestCard}>
+              <View style={styles.reqHeader}>
+                <Text style={styles.reqTitle}>{req.taskName}</Text>
+                <Badge label={badgeInfo.label} variant={badgeInfo.variant} />
+              </View>
+              {req.description ? (
+                <Text style={styles.reqDesc}>{req.description}</Text>
+              ) : null}
+              <View style={styles.reqFooter}>
+                <Text style={styles.reqMeta}>
+                  Slot: {req.targetSlotNumber || 'N/A'} · Ngày: {new Date(req.createdAt).toLocaleDateString('vi-VN')}
+                </Text>
+                {req.assignedStaffName ? (
+                  <Text style={styles.reqStaff}>NV: {req.assignedStaffName}</Text>
+                ) : (
+                  <Text style={[styles.reqStaff, { color: colors.gray[400] }]}>Chờ phân công</Text>
+                )}
+              </View>
+            </Card>
+          );
+        })
+      )}
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
@@ -132,4 +179,45 @@ const styles = StyleSheet.create({
   optionTitle: { ...typography.label, color: colors.gray[900] },
   optionSub: { ...typography.caption, color: colors.gray[500] },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
+  requestCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.white,
+    borderColor: colors.gray[200],
+    borderWidth: 1,
+  },
+  reqHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  reqTitle: {
+    ...typography.label,
+    color: colors.gray[800],
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  reqDesc: {
+    ...typography.bodySmall,
+    color: colors.gray[600],
+    marginBottom: spacing.sm,
+  },
+  reqFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+    paddingTop: spacing.xs,
+  },
+  reqMeta: {
+    ...typography.caption,
+    color: colors.gray[400],
+  },
+  reqStaff: {
+    ...typography.caption,
+    fontFamily: 'Inter_500Medium',
+    color: colors.green[700],
+  },
 });

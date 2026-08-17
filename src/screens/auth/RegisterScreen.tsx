@@ -187,11 +187,8 @@ export default function RegisterScreen({ navigation }: AuthScreenProps<'Register
       setLoading(false);
 
       if (result === true) {
-        Alert.alert(
-          'Đăng ký thành công! 🎉',
-          'Tài khoản của bạn đã được khởi tạo. Vui lòng đăng nhập.',
-          [{ text: 'Đăng nhập ngay', onPress: () => navigation.navigate('Login') }]
-        );
+        // Backend gửi OTP đến email — chuyển sang màn hình xác thực OTP
+        navigation.navigate('OtpVerification', { email: form.email.trim() });
       } else {
         setApiError(typeof result === 'string' ? result : 'Đăng ký thất bại.');
       }

@@ -5,8 +5,6 @@ import { LayoutDashboard, User } from 'lucide-react-native';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import UserManagementScreen from '../screens/admin/UserManagementScreen';
 import GlobalContentScreen from '../screens/admin/GlobalContentScreen';
-import AuditLogScreen from '../screens/admin/AuditLogScreen';
-import CameraDashboardScreen from '../screens/admin/CameraDashboardScreen';
 import AdminAccountScreen from '../screens/admin/AdminAccountScreen';
 import { colors } from '../theme/colors';
 import type { AdminStackParamList, AdminTabParamList } from './types';
@@ -54,8 +52,6 @@ export function AdminStack() {
       <Stack.Screen name="AdminTabs" component={AdminTabNavigator} />
       <Stack.Screen name="UserManagement" component={UserManagementScreen} />
       <Stack.Screen name="GlobalContent" component={GlobalContentScreen} />
-      <Stack.Screen name="AuditLog" component={AuditLogScreen} />
-      <Stack.Screen name="CameraDashboard" component={CameraDashboardScreen} />
       <Stack.Screen name="AdminAccount" component={AdminAccountScreen} />
     </Stack.Navigator>
   );

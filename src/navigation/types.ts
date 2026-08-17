@@ -7,6 +7,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  OtpVerification: { email: string };
 };
 
 export type CustomerTabParamList = {
@@ -20,7 +21,7 @@ export type CustomerStackParamList = {
   CustomerTabs: undefined;
   GardenDetail: { slot: AvailableSlotDTO };
   RentalDetail: { rental: BookingHistory };
-  IoTMonitoring: undefined;
+  IoTMonitoring: { slotId?: number; pillarId?: number; deviceId?: string } | undefined;
   CareServices: undefined;
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
@@ -38,7 +39,7 @@ export type GardenStaffTabParamList = {
 export type GardenStaffStackParamList = {
   GardenStaffTabs: undefined;
   TaskDetail: { taskId: number };
-  IoTMonitoring: undefined;
+  IoTMonitoring: { slotId?: number; pillarId?: number; deviceId?: string } | undefined;
   GardenStaffAlert: undefined;
 };
 

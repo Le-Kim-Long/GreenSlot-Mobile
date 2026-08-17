@@ -30,6 +30,50 @@ export const taskApi = {
 
   reportIssue: (taskId: number, data: IssueReportRequestDTO): Promise<GardeningTaskResponseDTO> =>
     apiClient.post(`/tasks/${taskId}/report-issue`, data).then(r => r.data),
+
+  /** Lấy danh sách tất cả các task — API Docs §4.1 */
+  getAllTasks: (): Promise<GardeningTaskResponseDTO[]> =>
+    apiClient.get('/tasks').then(r => r.data),
+
+  /** Tạo task mới — API Docs §4.2 & Java Controller */
+  createTask: (data: {
+    taskName: string;
+    description?: string;
+    taskType: string;
+    targetSlotId: number;
+    scheduledDate: string;
+    priority?: string;
+  }): Promise<GardeningTaskResponseDTO> =>
+    apiClient.post('/tasks/create', data).then(r => r.data),
+
+  /** Manager duyệt/bác bỏ công việc hoàn thành của Staff */
+  reviewTask: (taskId: number, data: { action: 'APPROVE' | 'REJECT'; rejectionReason?: string }): Promise<GardeningTaskResponseDTO> =>
+    apiClient.post(`/tasks/${taskId}/review`, data).then(r => r.data),
+
+  /** Customer xem danh sách yêu cầu dịch vụ đã gửi — API Docs §4 */
+  getMyServiceRequests: (): Promise<GardeningTaskResponseDTO[]> =>
+    apiClient.get('/customer/my-service-requests').then(r => r.data),
+
+  /** Upload ảnh bằng chứng lên server */
+  uploadEvidenceImage: async (uri: string): Promise<{ publicUrl: string }> => {
+    const formData = new FormData();
+    // Chế tạo cấu trúc Form File để upload lên React Native
+    const filename = uri.split('/').pop() || 'evidence.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    
+    formData.append('file', {
+      uri,
+      name: filename,
+      type,
+    } as any);
+
+    return apiClient.post('/images/upload/evidence', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then(r => r.data);
+  },
 };
 
 export const managerApi = {

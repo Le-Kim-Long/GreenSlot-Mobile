@@ -33,4 +33,12 @@ export const bookingApi = {
 
   repayBooking: (rentalId: number): Promise<BookingResponseDTO> =>
     apiClient.get<BookingResponseDTO>(`/bookings/${rentalId}/pay`).then(r => r.data),
+
+  /** Lấy danh sách thuê thực tế của customer — API Docs §2.5 */
+  getRentals: (): Promise<any[]> =>
+    apiClient.get('/customer/rentals').then(r => r.data),
+
+  /** Gửi phản hồi dịch vụ chăm sóc — API Docs §10.1 */
+  submitFeedback: (data: { rentalId: number; rating: number; comments: string }): Promise<{ message: string }> =>
+    apiClient.post('/feedback/service', data).then(r => r.data),
 };

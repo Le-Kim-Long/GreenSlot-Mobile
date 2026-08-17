@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (username: string, name: string, email: string, password: string, phone?: string) => Promise<string | true>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -107,6 +108,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const verifyOtp = async (email: string, otp: string): Promise<void> => {
+    // verifyOtp ném lỗi nếu OTP sai — caller xử lý exception
+    const data = await authApi.verifyOtp({ email, otp });
+    if (data?.token) {
+      await setStoredToken(data.token);
+      const role = mapBackendRolesToFrontend(data.roles) as UserRole;
+      const loggedUser: User = {
+        id: data.id?.toString(),
+        name: data.fullName || data.username,
+        email: data.email,
+        role,
+        createdAt: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(loggedUser));
+      setUser(loggedUser);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -115,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         register,
+        verifyOtp,
         isAuthenticated: !!user,
       }}
     >

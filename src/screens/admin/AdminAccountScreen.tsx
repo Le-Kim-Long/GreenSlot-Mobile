@@ -4,9 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   User,
   Users,
-  ShieldAlert,
   FileText,
-  Camera,
   Activity,
   ChevronRight,
   ShieldCheck,
@@ -50,9 +48,7 @@ export default function AdminAccountScreen({ navigation }: AdminAccountScreenPro
 
   const menuItems = [
     { icon: Users, label: 'Quản lý Người dùng & Cấp quyền', screen: 'UserManagement' as const },
-    { icon: FileText, label: 'Thấu thị Nhật ký Hệ thống (Audit Log)', screen: 'AuditLog' as const },
-    { icon: ShieldAlert, label: 'Quản lý Nội dung & Cấu hình toàn cục', screen: 'GlobalContent' as const },
-    { icon: Camera, label: 'Giám sát Camera & Thiết bị IoT', screen: 'CameraDashboard' as const },
+    { icon: FileText, label: 'Quản lý Nội dung & Cấu hình toàn cục', screen: 'GlobalContent' as const },
   ];
 
   const handleLogout = () => {

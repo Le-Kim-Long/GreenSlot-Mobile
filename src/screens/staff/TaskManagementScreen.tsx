@@ -41,6 +41,7 @@ export default function TaskManagementScreen() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceTypeDTO[]>([]);
   const [slots, setSlots] = useState<GardenSlotDTO[]>([]);
+  const [gardeners, setGardeners] = useState<any[]>(MOCK_GARDENERS);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -61,12 +62,20 @@ export default function TaskManagementScreen() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [servicesData, slotsData] = await Promise.all([
+      const [servicesData, slotsData, tasksData, staffData] = await Promise.all([
         businessManagerApi.getAllServiceTypes().catch(() => []),
         businessManagerApi.getAllSlots().catch(() => []),
+        taskApi.getAllTasks().catch(() => []),
+        businessManagerApi.getGardenStaffsByLocation(1).catch(() => []),
       ]);
       setServiceTypes(servicesData);
       setSlots(slotsData);
+      setTasks(tasksData);
+      if (staffData && staffData.length > 0) {
+        setGardeners(staffData.map(s => ({ id: s.id, name: s.fullName || s.username })));
+      } else {
+        setGardeners(MOCK_GARDENERS);
+      }
     } catch (error) {
       console.error('Lỗi khi tải dữ liệu:', error);
     } finally {
@@ -123,17 +132,39 @@ export default function TaskManagementScreen() {
 
       setIsSubmitting(true);
       try {
-        await taskApi.requestService({
-          slotId: Number(formData.targetSlotId),
-          description: `[${formData.taskName}] ${formData.description}`,
-          serviceTypeId: formData.serviceId ? Number(formData.serviceId) : 1,
+        const newTask = await taskApi.createTask({
+          taskName: formData.taskName.trim(),
+          description: formData.description.trim() || undefined,
+          taskType: formData.taskType,
+          targetSlotId: Number(formData.targetSlotId),
+          scheduledDate: new Date().toISOString(),
+          priority: 'MEDIUM',
         });
 
-        Alert.alert('Thành công', 'Đã yêu cầu & tạo công việc mới thành công!');
+        // Tự động gán nhân viên ngay sau khi tạo
+        if (formData.staffId && newTask?.id) {
+          await taskApi.assignTaskByPath(newTask.id, {
+            staffId: Number(formData.staffId),
+          });
+        }
+
+        Alert.alert('Thành công', 'Đã tạo & phân công công việc thành công!');
         setIsModalOpen(false);
         fetchData();
-      } catch {
-        Alert.alert('Lỗi', 'Tạo công việc thất bại. Vui lòng thử lại!');
+      } catch (err: any) {
+        // Fallback: Nếu không có quyền tạo task trực tiếp, thử requestService
+        try {
+          await taskApi.requestService({
+            slotId: Number(formData.targetSlotId),
+            description: `[${formData.taskName}] ${formData.description}`,
+            serviceTypeId: formData.serviceId ? Number(formData.serviceId) : 1,
+          });
+          Alert.alert('Thành công', 'Đã tạo yêu cầu công việc mới thành công!');
+          setIsModalOpen(false);
+          fetchData();
+        } catch {
+          Alert.alert('Lỗi', 'Tạo công việc thất bại. Vui lòng thử lại!');
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -146,19 +177,29 @@ export default function TaskManagementScreen() {
 
       setIsSubmitting(true);
       try {
-        await taskApi.assignTask({
-          taskId: selectedTask.id,
+        await taskApi.assignTaskByPath(selectedTask.id, {
           staffId: Number(formData.staffId),
-          slotId: selectedTask.targetSlotId,
-          taskName: selectedTask.taskName,
-          description: selectedTask.description,
         });
 
         Alert.alert('Thành công', 'Gán công việc thành công!');
         setIsModalOpen(false);
         fetchData();
-      } catch {
-        Alert.alert('Lỗi', 'Gán công việc thất bại!');
+      } catch (err: any) {
+        // Fallback sang assignTask cũ
+        try {
+          await taskApi.assignTask({
+            taskId: selectedTask.id,
+            staffId: Number(formData.staffId),
+            slotId: selectedTask.targetSlotId,
+            taskName: selectedTask.taskName,
+            description: selectedTask.description,
+          });
+          Alert.alert('Thành công', 'Gán công việc thành công!');
+          setIsModalOpen(false);
+          fetchData();
+        } catch {
+          Alert.alert('Lỗi', 'Gán công việc thất bại!');
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -302,7 +343,7 @@ export default function TaskManagementScreen() {
               ) : null}
 
               <Text style={styles.label}>Chọn Nhân viên thực hiện *</Text>
-              {MOCK_GARDENERS.map((g) => (
+              {gardeners.map((g) => (
                 <TouchableOpacity
                   key={g.id}
                   style={[

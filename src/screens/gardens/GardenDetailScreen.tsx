@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { cacheSlotId, cacheSlotForRental } from '../../utils/slotCache';
 import {
   View,
   Text,
@@ -27,7 +28,7 @@ const MONTH_NAMES = [
   'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
 ];
 
-const SHORT_MONTHS = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+const SHORT_MONTHS = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
 const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12, 18, 24];
@@ -245,6 +246,13 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
         durationInMonths: selectedMonths,
         startTime: startDate.toISOString(),
       });
+
+      // Cache slotId ngay sau khi đặt thuê thành công
+      // BookingResponseDTO không trả slotId, dùng slot.id từ route params
+      cacheSlotId(slot.slotNumber, slot.id);
+      if (result.rentalId) {
+        cacheSlotForRental(result.rentalId, slot.id);
+      }
 
       if (result.paymentUrl) {
         Alert.alert(

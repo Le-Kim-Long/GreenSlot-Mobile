@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, FileText, ShieldAlert, Activity, ChevronRight, RefreshCw, LogOut, Video } from 'lucide-react-native';
+import { Users, FileText, Activity, ChevronRight, RefreshCw, LogOut } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { adminApi } from '../../api/adminApi';
@@ -28,7 +28,6 @@ export default function AdminDashboardScreen() {
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeContent: 0,
-    recentLogsCount: 0,
   });
 
   const handleLogout = () => {
@@ -45,10 +44,9 @@ export default function AdminDashboardScreen() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [usersRes, contentRes, logsRes] = await Promise.allSettled([
+      const [usersRes, contentRes] = await Promise.allSettled([
         adminApi.getAllUsers(0, 1),
         adminApi.getAllGlobalContent(),
-        adminApi.getAuditLogs(undefined, undefined, 0, 1),
       ]);
 
       let totalUsers = 0;
@@ -61,15 +59,9 @@ export default function AdminDashboardScreen() {
         activeContent = contentRes.value.length;
       }
 
-      let recentLogsCount = 0;
-      if (logsRes.status === 'fulfilled' && logsRes.value) {
-        recentLogsCount = logsRes.value.totalElements || 0;
-      }
-
       setStats({
         totalUsers,
         activeContent,
-        recentLogsCount,
       });
     } catch {
       // Ignore
@@ -146,13 +138,6 @@ export default function AdminDashboardScreen() {
             <Text style={styles.statLabel}>Nội dung</Text>
           </View>
 
-          <View style={styles.statBox}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.yellow[50] }]}>
-              <ShieldAlert size={22} color={colors.yellow[600]} />
-            </View>
-            <Text style={styles.statValue}>{stats.recentLogsCount}</Text>
-            <Text style={styles.statLabel}>Logs hệ thống</Text>
-          </View>
         </View>
 
         {/* Quick Menu */}
@@ -188,35 +173,7 @@ export default function AdminDashboardScreen() {
           <ChevronRight size={20} color={colors.gray[400]} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuCard}
-          onPress={() => navigation.navigate('AuditLog')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.menuIconContainer, { backgroundColor: colors.yellow[50] }]}>
-            <ShieldAlert size={24} color={colors.yellow[600]} />
-          </View>
-          <View style={styles.menuInfo}>
-            <Text style={styles.menuTitle}>Nhật ký Hệ thống (Audit Log)</Text>
-            <Text style={styles.menuSubtitle}>Theo dõi hành động của người dùng & quản trị viên</Text>
-          </View>
-          <ChevronRight size={20} color={colors.gray[400]} />
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuCard}
-          onPress={() => navigation.navigate('CameraDashboard')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.menuIconContainer, { backgroundColor: '#1e293b' }]}>
-            <Video size={24} color="#94a3b8" />
-          </View>
-          <View style={styles.menuInfo}>
-            <Text style={styles.menuTitle}>Giám sát Camera IoT</Text>
-            <Text style={styles.menuSubtitle}>Xem live stream từ ESP32-CAM và chụp ảnh hiện trường</Text>
-          </View>
-          <ChevronRight size={20} color={colors.gray[400]} />
-        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.menuCard, { borderColor: colors.red[100], backgroundColor: colors.red[100] + '30', marginTop: spacing.md }]}

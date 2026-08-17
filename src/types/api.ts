@@ -52,6 +52,20 @@ export interface AvailableSlotResponseDTO {
   pillarCode: string;
   locationName: string;
   imageUrl?: string;
+  locationId?: number;
+  locationAddress?: string;
+}
+
+export interface CustomerRentalDTO {
+  id: number;
+  slotNumber: string;
+  pillarCode?: string;
+  locationName?: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  currentTreeName?: string;
+  daysRemaining?: number;
 }
 
 export interface BookingRequestDTO {

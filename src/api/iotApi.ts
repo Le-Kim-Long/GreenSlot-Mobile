@@ -9,4 +9,12 @@ export const iotApi = {
 
   getReadingsHistory: (deviceId: string = IOT_DEVICE_ID): Promise<SensorReadingResponseDTO[]> =>
     apiClient.get(`/iot/readings/history`, { params: { deviceId } }).then((r) => r.data),
+
+  /** Lấy chỉ số cảm biến mới nhất (hỗ trợ lọc theo slotId cho Customer) — API Docs §6.2 */
+  getLatestSensorReadings: (params: { pillarId?: number; slotId?: number; deviceId?: string }): Promise<SensorReadingResponseDTO[]> =>
+    apiClient.get('/iot/sensors/latest', { params }).then(r => r.data),
+
+  /** Điều khiển bơm tưới tiêu — API Docs §6.4 */
+  controlPump: (data: { deviceId: string; status: 'ON' | 'OFF' }): Promise<any> =>
+    apiClient.post('/iot/pump/control', data).then(r => r.data),
 };

@@ -10,7 +10,6 @@ import {
   Alert,
   AppState,
   TextInput,
-  ActivityIndicator,
   type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,17 +25,18 @@ import {
   Clock,
   CheckCircle2,
   RotateCcw,
-  Wrench,
+  Cpu,
+  Star,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
-import { managerApi, taskApi } from '../../api/taskApi';
+import { taskApi } from '../../api/taskApi';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { Button } from '../../components/ui/Button';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerStackProps } from '../../navigation/types';
-import type { PaymentTransactionInfo, ServiceType } from '../../types/api';
+import type { PaymentTransactionInfo } from '../../types/api';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12, 18, 24];
@@ -129,63 +129,6 @@ function DurationPicker({ visible, current, onSelect, onClose }: DurationPickerP
   );
 }
 
-// ─── Service Picker Modal ────────────────────────────────────────────────────
-interface ServicePickerProps {
-  visible: boolean;
-  services: ServiceType[];
-  current: number | null;
-  onSelect: (id: number) => void;
-  onClose: () => void;
-}
-
-function ServicePicker({ visible, services, current, onSelect, onClose }: ServicePickerProps) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={pickerStyles.overlay}>
-        <View style={pickerStyles.sheet}>
-          <View style={pickerStyles.header}>
-            <Text style={pickerStyles.title}>Chọn dịch vụ chăm sóc</Text>
-            <TouchableOpacity onPress={onClose} style={pickerStyles.closeBtn}>
-              <X size={22} color={colors.gray[600]} />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={services}
-            keyExtractor={item => item.id!.toString()}
-            contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}
-            renderItem={({ item }) => {
-              const isSelected = item.id === current;
-              return (
-                <TouchableOpacity
-                  style={[
-                    styles.serviceOptionCard,
-                    isSelected && styles.serviceOptionCardSelected
-                  ]}
-                  onPress={() => { if (item.id != null) onSelect(item.id); onClose(); }}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.serviceOptionName, isSelected && styles.serviceOptionNameSelected]}>
-                      {item.name}
-                    </Text>
-                    {item.description ? (
-                      <Text style={[styles.serviceOptionDesc, isSelected && styles.serviceOptionDescSelected]}>
-                        {item.description}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text style={[styles.serviceOptionPrice, isSelected && styles.serviceOptionPriceSelected]}>
-                    {formatCurrency(item.price)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-}
 
 // ─── Transaction Row ─────────────────────────────────────────────────────────
 function TransactionRow({ tx }: { tx: PaymentTransactionInfo }) {
@@ -215,14 +158,38 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   const [pickerVisible, setPickerVisible] = useState(false);
   const [extending, setExtending] = useState(false);
 
-  // Care services states
-  const [services, setServices] = useState<ServiceType[]>([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
-  const [servicesError, setServicesError] = useState(false);
+  // Feedback states (Phase 2.3)
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  // Service request states
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
-  const [description, setDescription] = useState('');
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
-  const [servicePickerVisible, setServicePickerVisible] = useState(false);
+  const [description, setDescription] = useState('');
+
+  const handleSendFeedback = async () => {
+    if (!feedbackComment.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập bình luận đánh giá!');
+      return;
+    }
+    setSubmittingFeedback(true);
+    try {
+      await bookingApi.submitFeedback({
+        rentalId: rental.id,
+        rating: feedbackRating,
+        comments: feedbackComment.trim(),
+      });
+      Alert.alert('Thành công', 'Cảm ơn bạn đã gửi đánh giá phản hồi!');
+      setFeedbackSubmitted(true);
+      setFeedbackComment('');
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại sau.');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   // AppState ref for payment result detection
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
@@ -230,42 +197,26 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
   const currentEndDate = useMemo(() => parseToDate(rental.endDate), [rental.endDate]);
   const newEndDate = useMemo(() => addMonthsToDate(currentEndDate, selectedMonths), [currentEndDate, selectedMonths]);
-  const pricePerMonth = useMemo(() => rental.totalPrice / Math.max(1,
+
+  // Tổng tiền: ưu tiên totalPrice từ adapter; nếu = 0 thì tính lại từ transactions
+  const displayTotal = useMemo(() => {
+    if (rental.totalPrice && rental.totalPrice > 0) return rental.totalPrice;
+    if (rental.transactions && rental.transactions.length > 0) {
+      const sum = rental.transactions.reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
+      return sum > 0 ? sum : 0;
+    }
+    return 0;
+  }, [rental.totalPrice, rental.transactions]);
+
+  const pricePerMonth = useMemo(() => displayTotal / Math.max(1,
     (() => {
       const start = parseToDate(rental.startDate);
       const end = parseToDate(rental.endDate);
       const diffMs = end.getTime() - start.getTime();
       return Math.max(1, Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)));
     })()
-  ), [rental]);
+  ), [displayTotal, rental.startDate, rental.endDate]);
   const extensionCost = pricePerMonth * selectedMonths;
-
-  const selectedService = useMemo(() => {
-    return services.find(s => s.id === selectedServiceId) || null;
-  }, [services, selectedServiceId]);
-
-  // Load service types on mount
-  const loadServiceTypes = () => {
-    setServicesLoading(true);
-    setServicesError(false);
-    managerApi.getServiceTypes()
-      .then(types => {
-        setServices(types);
-        if (types.length && types[0].id != null) {
-          setSelectedServiceId(types[0].id);
-        }
-      })
-      .catch(err => {
-        console.warn('Failed to load service types:', err);
-        setServicesError(true);
-      })
-      .finally(() => setServicesLoading(false));
-  };
-
-  useEffect(() => {
-    if (rental.status === 'ACTIVE') loadServiceTypes();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Detect return from VNPay browser
   useEffect(() => {
@@ -401,9 +352,27 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Tổng tiền hợp đồng</Text>
-            <Text style={styles.totalValue}>{formatCurrency(rental.totalPrice)}</Text>
+            <Text style={styles.totalValue}>{formatCurrency(displayTotal)}</Text>
           </View>
         </View>
+
+        {/* ── IoT Monitoring Card (chỉ khi ACTIVE) ─── */}
+        {isActive && (
+          <View style={[styles.card, { borderColor: colors.green[300], borderWidth: 1.5 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs }}>
+              <Cpu size={20} color={colors.green[700]} />
+              <Text style={styles.sectionTitle}>Giám sát IoT thời gian thực</Text>
+            </View>
+            <Text style={{ ...typography.bodySmall, color: colors.gray[500], marginBottom: spacing.md }}>
+              Xem độ ẩm đất, nhiệt độ, độ pH và cường độ ánh sáng hiện tại của ô vườn {rental.slotNumber}.
+            </Text>
+            <Button
+              title="Xem thông số cảm biến"
+              onPress={() => navigation.navigate('IoTMonitoring', { slotId: rental.slotId || rental.id })}
+              variant="outline"
+            />
+          </View>
+        )}
 
         {/* ── Transaction History ──────────────────────── */}
         {rental.transactions && rental.transactions.length > 0 && (
@@ -415,87 +384,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         )}
 
-        {/* ── Care Service Request Card (chỉ khi ACTIVE) ─── */}
-        {isActive && (
-          <View style={[styles.card, styles.serviceCard]}>
-            <View style={styles.serviceHeader}>
-              <Wrench size={20} color={colors.green[700]} />
-              <Text style={styles.sectionTitle}>Đăng ký Dịch vụ Chăm sóc</Text>
-            </View>
-            <Text style={styles.serviceSubtitle}>
-              Gửi yêu cầu chăm sóc, bón phân, tỉa cành hoặc xử lý sâu bệnh cho ô vườn này.
-            </Text>
 
-            {/* Loading state */}
-            {servicesLoading && (
-              <View style={styles.serviceStatusBox}>
-                <ActivityIndicator size="small" color={colors.green[600]} />
-                <Text style={styles.serviceStatusText}>Đang tải danh sách dịch vụ...</Text>
-              </View>
-            )}
-
-            {/* Error state */}
-            {!servicesLoading && servicesError && (
-              <View style={styles.serviceStatusBox}>
-                <Text style={styles.serviceStatusText}>Không thể tải dịch vụ.</Text>
-                <TouchableOpacity onPress={loadServiceTypes} style={styles.retryBtn}>
-                  <Text style={styles.retryBtnText}>Thử lại</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Empty state */}
-            {!servicesLoading && !servicesError && services.length === 0 && (
-              <View style={styles.serviceStatusBox}>
-                <Text style={styles.serviceStatusText}>Chưa có dịch vụ nào được cung cấp.</Text>
-              </View>
-            )}
-
-            {/* Service picker (only when services loaded) */}
-            {!servicesLoading && services.length > 0 && (
-              <>
-                <Text style={styles.fieldLabel}>Chọn loại dịch vụ *</Text>
-                <TouchableOpacity
-                  style={styles.pickerButton}
-                  onPress={() => setServicePickerVisible(true)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.pickerButtonText} numberOfLines={1}>
-                    {selectedService ? selectedService.name : 'Vui lòng chọn dịch vụ...'}
-                  </Text>
-                  <View style={styles.pickerBadge}>
-                    <Text style={styles.pickerBadgeText}>Thay đổi</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {selectedService && (
-                  <View style={styles.servicePriceSummary}>
-                    <Text style={styles.servicePriceLabel}>Phí dịch vụ:</Text>
-                    <Text style={styles.servicePriceValue}>{formatCurrency(selectedService.price)}</Text>
-                  </View>
-                )}
-
-                <Text style={styles.fieldLabel}>Ghi chú chi tiết yêu cầu</Text>
-                <TextInput
-                  style={styles.textArea}
-                  placeholder="Nhập ghi chú hoặc yêu cầu cụ thể dành cho nhân viên vườn..."
-                  placeholderTextColor={colors.gray[400]}
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={3}
-                />
-
-                <Button
-                  title="Gửi yêu cầu chăm sóc"
-                  onPress={handleRequestService}
-                  loading={serviceSubmitting}
-                  disabled={!selectedServiceId}
-                />
-              </>
-            )}
-          </View>
-        )}
 
         {/* ── Extension Card (chỉ khi ACTIVE) ─────────── */}
         {isActive && (
@@ -569,6 +458,59 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         )}
 
+        {/* ── Feedback Card (chỉ hiển thị khi Hợp đồng đã hoàn thành/hết hạn và chưa gửi feedback) ─── */}
+        {!isActive && rental.status !== 'PENDING' && !feedbackSubmitted && (
+          <View style={[styles.card, { borderColor: colors.yellow[300], borderWidth: 1.5 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs }}>
+              <Star size={20} color={colors.yellow[600]} fill={colors.yellow[500]} />
+              <Text style={styles.sectionTitle}>Đánh giá dịch vụ</Text>
+            </View>
+            <Text style={{ ...typography.bodySmall, color: colors.gray[500], marginBottom: spacing.md }}>
+              Hãy chia sẻ trải nghiệm của bạn về dịch vụ thuê ô vườn {rental.slotNumber} này.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', marginBottom: spacing.md }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setFeedbackRating(star)}>
+                  <Star
+                    size={32}
+                    color={star <= feedbackRating ? colors.yellow[500] : colors.gray[300]}
+                    fill={star <= feedbackRating ? colors.yellow[400] : 'transparent'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Bình luận / Phản hồi của bạn</Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Nhập ý kiến đóng góp của bạn về chất lượng vườn, nhân viên chăm sóc..."
+              placeholderTextColor={colors.gray[400]}
+              value={feedbackComment}
+              onChangeText={setFeedbackComment}
+              multiline
+              numberOfLines={3}
+            />
+
+            <Button
+              title="Gửi đánh giá"
+              onPress={handleSendFeedback}
+              loading={submittingFeedback}
+            />
+          </View>
+        )}
+
+        {/* ── Feedback Submitted Success Card ─── */}
+        {feedbackSubmitted && (
+          <View style={[styles.card, { borderColor: colors.green[300], borderWidth: 1.5, alignItems: 'center', padding: spacing.xl }]}>
+            <CheckCircle2 size={40} color={colors.green[600]} style={{ marginBottom: spacing.sm }} />
+            <Text style={[typography.label, { color: colors.green[800] }]}>Đã gửi đánh giá thành công!</Text>
+            <Text style={[typography.bodySmall, { color: colors.gray[500], textAlign: 'center', marginTop: 4 }]}>
+              Cảm ơn đóng góp ý kiến quý báu từ bạn để giúp GreenSlot ngày một hoàn thiện hơn.
+            </Text>
+          </View>
+        )}
+
         {/* Padding bottom */}
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -581,14 +523,6 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
         onClose={() => setPickerVisible(false)}
       />
 
-      {/* Service Picker Modal */}
-      <ServicePicker
-        visible={servicePickerVisible}
-        services={services}
-        current={selectedServiceId}
-        onSelect={setSelectedServiceId}
-        onClose={() => setServicePickerVisible(false)}
-      />
     </SafeAreaView>
   );
 }
