@@ -132,6 +132,7 @@ export interface GardeningTaskResponseDTO {
   targetSlotId?: number;
   targetSlotNumber?: string;
   createdAt: string;
+  rejectionReason?: string;
 }
 
 export interface SensorReadingResponseDTO {
