@@ -235,6 +235,7 @@ export interface TreeDTO {
   scientificName: string;
   description?: string;
   harvestDays?: number;
+  growthDurationDays?: number;
   minRentalDays?: number;
   price?: number;
   imageUrl?: string;

@@ -71,8 +71,25 @@ export default function CustomerTreePlantingScreen() {
 
   const handleSubmit = async () => {
     if (!selectedRental || !selectedTree || !reason.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng chọn ô đất, giống cây và điền lý do.');
+      Alert.alert('Lưu ý', 'Vui lòng chọn ô đất, giống cây và điền lý do.');
       return;
+    }
+
+    // Kiểm tra thời gian sinh trưởng của cây so với thời hạn thuê còn lại
+    const growthDays = selectedTree.growthDurationDays || selectedTree.harvestDays || (selectedTree as any).growthDays || 0;
+    if (growthDays > 0 && (selectedRental.endDate || (selectedRental as any).endTime)) {
+      const endStr = selectedRental.endDate || (selectedRental as any).endTime;
+      const end = new Date(endStr).getTime();
+      const now = new Date().getTime();
+      const remainingDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+
+      if (remainingDays > 0 && growthDays > remainingDays) {
+        Alert.alert(
+          'Không thể gửi yêu cầu',
+          `Thời gian sinh trưởng của giống cây (${growthDays} ngày) vượt quá thời hạn thuê còn lại của ô đất (${remainingDays} ngày). Vui lòng gia hạn hợp đồng trước!`
+        );
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -90,8 +107,9 @@ export default function CustomerTreePlantingScreen() {
       setReason('');
       setNotes('');
       fetchData();
-    } catch (error) {
-      Alert.alert('Thất bại', 'Không thể gửi yêu cầu. Vui lòng thử lại sau.');
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.message || 'Không thể gửi yêu cầu. Vui lòng thử lại sau.';
+      Alert.alert('Thất bại', errorMsg);
     } finally {
       setIsSubmitting(false);
     }
