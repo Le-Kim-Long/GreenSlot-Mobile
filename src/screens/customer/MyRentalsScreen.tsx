@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,32 +67,24 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
           setRentals(updated);
           const rental = updated.find(r => r.id === rentalId);
           const newStatus = rental?.status ?? '';
-
+          let payStatus: 'success' | 'failed' | 'pending';
           if (newStatus === 'ACTIVE') {
-            Alert.alert(
-              '🎉 Thanh toán thành công!',
-              'Ô vườn của bạn đã được kích hoạt. Chúc bạn trồng trọt vui vẻ!',
-              [{ text: 'OK' }]
-            );
+            payStatus = 'success';
           } else if (prevStatus === newStatus) {
-            // Trạng thái chưa thay đổi — có thể user chưa thanh toán hoặc đang xử lý
-            Alert.alert(
-              '⏳ Chưa ghi nhận thanh toán',
-              'Giao dịch chưa được xác nhận. Nếu bạn đã thanh toán, vui lòng chờ vài phút rồi kéo để làm mới.',
-              [{ text: 'OK' }]
-            );
+            payStatus = 'pending';
           } else {
-            Alert.alert(
-              '❌ Thanh toán thất bại',
-              'Giao dịch không thành công hoặc bị hủy. Vui lòng thử lại.',
-              [{ text: 'OK' }]
-            );
+            payStatus = 'failed';
           }
+          navigation.navigate('PaymentResult', {
+            status: payStatus,
+            rentalId: rentalId,
+            slotNumber: rental?.slotNumber,
+            txnRef: rental?.transactions?.[0]?.vnpTxnRef,
+          });
         } catch {
           // Không làm gì nếu lỗi mạng
         }
       }
-
       appStateRef.current = nextState;
     });
 

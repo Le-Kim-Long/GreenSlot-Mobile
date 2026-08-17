@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -204,28 +204,19 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
           // Tìm rental mới nhất của slot này
           const newRental = history.find(r => r.slotId === slot.id || r.slotNumber === slot.slotNumber);
 
+          let payStatus: 'success' | 'failed' | 'pending';
           if (newRental?.status === 'ACTIVE') {
-            Alert.alert(
-              '🎉 Đặt thuê thành công!',
-              `Ô vườn ${slot.slotNumber} đã được kích hoạt. Chúc bạn trồng trọt vui vẻ!`,
-              [{
-                text: 'OK',
-                onPress: () => navigation.goBack(),
-              }]
-            );
+            payStatus = 'success';
           } else if (newRental?.status === 'PENDING_PAYMENT' || newRental?.status === 'PENDING') {
-            Alert.alert(
-              '⏳ Chưa ghi nhận thanh toán',
-              'Giao dịch chưa được xác nhận. Nếu bạn đã thanh toán, vui lòng chờ vài phút rồi kiểm tra trong mục “Vườn đang thuê”.',
-              [{ text: 'OK' }]
-            );
+            payStatus = 'pending';
           } else {
-            Alert.alert(
-              '❌ Thanh toán thất bại',
-              'Giao dịch không thành công hoặc bị hủy. Vui lòng thử lại.',
-              [{ text: 'OK' }]
-            );
+            payStatus = 'failed';
           }
+          navigation.navigate('PaymentResult', {
+            status: payStatus,
+            slotNumber: slot.slotNumber,
+            rentalId: newRental?.id,
+          });
         } catch {
           // Không làm gì nếu lỗi mạng
         }

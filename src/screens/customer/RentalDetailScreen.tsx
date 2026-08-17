@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -277,13 +277,19 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           const history = await bookingApi.getHistory();
           const updated = history.find(r => r.id === rental.id);
           if (updated) setRental(updated);
-          Alert.alert(
-            updated?.status === 'ACTIVE' ? '🎉 Gia hạn thành công!' : '⏳ Chưa ghi nhận',
-            updated?.status === 'ACTIVE'
-              ? `Ô vườn ${rental.slotNumber} đã được gia hạn đến ${formatDate(updated.endDate)}.`
-              : 'Giao dịch chưa được xác nhận. Vui lòng kéo để làm mới.',
-            [{ text: 'OK' }]
-          );
+            let payStatus: 'success' | 'failed' | 'pending';
+            if (updated?.status === 'ACTIVE') {
+              payStatus = 'success';
+            } else {
+              payStatus = 'pending';
+            }
+            navigation.navigate('PaymentResult', {
+              status: payStatus,
+              rentalId: rental.id,
+              slotNumber: rental.slotNumber,
+              txnRef: updated?.transactions?.[0]?.vnpTxnRef,
+              amount: updated?.transactions?.[0]?.amount?.toString(),
+            });
         } catch { /* silent */ }
       }
       appStateRef.current = next;

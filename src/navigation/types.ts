@@ -26,6 +26,14 @@ export type CustomerStackParamList = {
   CustomerDashboard: undefined;
   Notifications: undefined;
   CustomerTreePlanting: undefined;
+  PaymentResult: {
+    status: 'success' | 'failed' | 'pending';
+    rentalId?: number;
+    slotNumber?: string;
+    amount?: string;
+    txnRef?: string;
+    orderInfo?: string;
+  };
 };
 
 export type GardenStaffTabParamList = {
