@@ -58,6 +58,7 @@ export interface BookingRequestDTO {
   slotId: number;
   durationInMonths: number;
   startTime: string;
+  isMobile?: boolean;
 }
 
 export interface BookingResponseDTO {
@@ -69,6 +70,7 @@ export interface BookingResponseDTO {
 export interface ExtensionRequestDTO {
   rentalId: number;
   durationInMonths: number;
+  isMobile?: boolean;
 }
 
 export interface PaymentTransactionInfo {

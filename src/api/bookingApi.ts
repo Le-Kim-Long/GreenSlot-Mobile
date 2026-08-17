@@ -32,5 +32,5 @@ export const bookingApi = {
     apiClient.patch<{ message: string }>(`/bookings/${rentalId}/cancel`).then(r => r.data),
 
   repayBooking: (rentalId: number): Promise<BookingResponseDTO> =>
-    apiClient.get<BookingResponseDTO>(`/bookings/${rentalId}/pay`).then(r => r.data),
+    apiClient.get<BookingResponseDTO>(`/bookings/${rentalId}/pay?isMobile=true`).then(r => r.data),
 };

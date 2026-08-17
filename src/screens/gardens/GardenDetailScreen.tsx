@@ -244,6 +244,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
         slotId: slot.id,
         durationInMonths: selectedMonths,
         startTime: startDate.toISOString(),
+        isMobile: true,
       });
 
       if (result.paymentUrl) {

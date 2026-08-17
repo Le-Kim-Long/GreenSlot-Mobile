@@ -305,6 +305,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               const result = await bookingApi.extendBooking({
                 rentalId: rental.id,
                 durationInMonths: selectedMonths,
+                isMobile: true,
               });
               if (result.paymentUrl) {
                 pendingExtendRef.current = true;
