@@ -50,6 +50,8 @@ export interface AvailableSlotResponseDTO {
   price: number;
   status: string;
   pillarCode: string;
+  pillarCodes?: string[];
+  pillarCount?: number;
   locationName: string;
   imageUrl?: string;
 }
@@ -85,6 +87,14 @@ export interface RentalHistoryDTO {
   rentalId: number;
   slotNumber: string;
   pillarCode?: string;
+  pillarCodes?: string[];
+  pillars?: {
+    id: number;
+    pillarCode: string;
+    status: string;
+    cameraStreamUrl?: string;
+    cameraStatus?: string;
+  }[];
   locationName?: string;
   locationAddress?: string;
   startTime: string;
@@ -447,6 +457,14 @@ export interface BookingHistory {
   slotId?: number;
   slotNumber: string;
   pillarCode?: string;
+  pillarCodes?: string[];
+  pillars?: {
+    id: number;
+    pillarCode: string;
+    status: string;
+    cameraStreamUrl?: string;
+    cameraStatus?: string;
+  }[];
   locationName?: string;
   locationAddress?: string;
   startDate: string;
