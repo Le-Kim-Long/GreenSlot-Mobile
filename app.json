@@ -30,7 +30,10 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiUrl": "http://10.10.10.254:8080/api"
+      "apiUrl": "http://10.10.10.254:8080/api",
+      "eas": {
+        "projectId": "06829a8c-f0a0-4ab5-9bba-0a32f4fbd2f0"
+      }
     },
     "plugins": [
       "expo-font",
