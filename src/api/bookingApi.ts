@@ -1,5 +1,6 @@
 import apiClient from './client';
 import { mapRentalHistoryList } from '../utils/bookingAdapter';
+import { getMobileRedirectUrl } from '../utils/paymentFlow';
 import type {
   AvailableSlotResponseDTO,
   BookingHistory,
@@ -32,5 +33,9 @@ export const bookingApi = {
     apiClient.patch<{ message: string }>(`/bookings/${rentalId}/cancel`).then(r => r.data),
 
   repayBooking: (rentalId: number): Promise<BookingResponseDTO> =>
-    apiClient.get<BookingResponseDTO>(`/bookings/${rentalId}/pay?isMobile=true`).then(r => r.data),
+    apiClient
+      .get<BookingResponseDTO>(`/bookings/${rentalId}/pay`, {
+        params: { isMobile: true, customMobileRedirectUrl: getMobileRedirectUrl() },
+      })
+      .then(r => r.data),
 };

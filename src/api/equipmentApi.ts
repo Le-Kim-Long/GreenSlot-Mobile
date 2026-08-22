@@ -30,7 +30,7 @@ export const equipmentApi = {
   uploadImage: (file: any): Promise<EquipmentImageUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    return apiClient.post('/equipment/upload-image', formData, {
+    return apiClient.post('/images/upload/equipment', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

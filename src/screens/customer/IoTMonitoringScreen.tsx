@@ -27,7 +27,7 @@ export default function IoTMonitoringScreen() {
 
   const load = async () => {
     try {
-      const data = await iotApi.getLatestReadings(IOT_DEVICE_ID);
+      const data = await iotApi.getLatestReadings({ deviceId: IOT_DEVICE_ID });
       setReadings(data);
       setLastUpdate(new Date().toLocaleTimeString('vi-VN'));
     } catch {

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,9 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  AppState,
-  type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
+import { useFocusEffect } from '@react-navigation/native';
 import { Leaf, Clock, CreditCard, ChevronRight } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import type { BookingHistory } from '../../types/api';
@@ -23,6 +21,7 @@ import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerTabProps } from '../../navigation/types';
+import { openAndWaitForPayment } from '../../utils/paymentFlow';
 
 type TabKey = 'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'COMPLETED';
 
@@ -32,10 +31,6 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [repayingId, setRepayingId] = useState<number | null>(null);
-
-  // Lưu rentalId đang chờ thanh toán để kiểm tra khi user quay về app
-  const pendingRepayRef = useRef<{ rentalId: number; prevStatus: string } | null>(null);
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const load = useCallback(async () => {
     try {
@@ -50,46 +45,11 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     load().finally(() => setLoading(false));
   }, [load]);
 
-  // Khi user quay lại app từ browser VNPay → kiểm tra kết quả thanh toán
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
-      const wasBackground =
-        appStateRef.current === 'background' || appStateRef.current === 'inactive';
-      const nowActive = nextState === 'active';
-
-      if (wasBackground && nowActive && pendingRepayRef.current) {
-        const { rentalId, prevStatus } = pendingRepayRef.current;
-        pendingRepayRef.current = null;
-
-        // Reload danh sách để lấy trạng thái mới nhất
-        try {
-          const updated = await bookingApi.getHistory();
-          setRentals(updated);
-          const rental = updated.find(r => r.id === rentalId);
-          const newStatus = rental?.status ?? '';
-          let payStatus: 'success' | 'failed' | 'pending';
-          if (newStatus === 'ACTIVE') {
-            payStatus = 'success';
-          } else if (prevStatus === newStatus) {
-            payStatus = 'pending';
-          } else {
-            payStatus = 'failed';
-          }
-          navigation.navigate('PaymentResult', {
-            status: payStatus,
-            rentalId: rentalId,
-            slotNumber: rental?.slotNumber,
-            txnRef: rental?.transactions?.[0]?.vnpTxnRef,
-          });
-        } catch {
-          // Không làm gì nếu lỗi mạng
-        }
-      }
-      appStateRef.current = nextState;
-    });
-
-    return () => subscription.remove();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -129,9 +89,16 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     try {
       const result = await bookingApi.repayBooking(rental.id);
       if (result.paymentUrl) {
-        // Lưu thông tin rental đang chờ thanh toán để kiểm tra khi quay về
-        pendingRepayRef.current = { rentalId: rental.id, prevStatus: rental.status };
-        await Linking.openURL(result.paymentUrl);
+        const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
+        const callback = 'callback' in settled ? settled.callback : undefined;
+        navigation.navigate('PaymentResult', {
+          status: settled.status,
+          rentalId: rental.id,
+          slotNumber: rental.slotNumber,
+          amount: callback?.amount,
+          txnRef: callback?.txnRef,
+          orderInfo: callback?.orderInfo,
+        });
       } else {
         Alert.alert('Thông báo', 'Không tìm thấy link thanh toán. Vui lòng thử lại sau.');
       }

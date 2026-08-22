@@ -21,6 +21,7 @@ import CustomerAnalyticsScreen from '../screens/staff/CustomerAnalyticsScreen';
 import ManagerAccountScreen from '../screens/staff/ManagerAccountScreen';
 import { colors } from '../theme/colors';
 import type { StaffTabParamList, StaffStackParamList } from './types';
+import IoTOperationsScreen from '../screens/staff/IoTOperationsScreen';
 
 const Tab = createBottomTabNavigator<StaffTabParamList>();
 const Stack = createNativeStackNavigator<StaffStackParamList>();
@@ -78,7 +79,7 @@ export function StaffStack() {
       <Stack.Screen name="AlertHistory" component={AlertHistoryScreen} />
       <Stack.Screen name="AlertProcessing" component={AlertProcessingScreen} />
       <Stack.Screen name="CustomerAnalytics" component={CustomerAnalyticsScreen} />
+      <Stack.Screen name="IoTOperations" component={IoTOperationsScreen} />
     </Stack.Navigator>
   );
 }
-

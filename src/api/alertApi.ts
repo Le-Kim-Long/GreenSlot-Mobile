@@ -40,5 +40,7 @@ export const alertApi = {
     const response = await apiClient.get(`/alerts/${alertId}/logs`);
     return response.data;
   },
+  escalateAlert: (alertId: number, escalateToUserId: number, reason: string) =>
+    apiClient.post(`/alerts/${alertId}/escalate`, null, { params: { escalateToUserId, reason } }).then(r => r.data),
 };
 

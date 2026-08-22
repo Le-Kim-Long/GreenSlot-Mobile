@@ -28,5 +28,7 @@ export const staffScheduleApi = {
 
   deleteSchedule: (id: number): Promise<void> =>
     apiClient.delete(`/staff-schedules/${id}`).then(r => r.data),
+
+  checkIn: (id: number, data?: unknown) => apiClient.put(`/staff-schedules/${id}`, { ...(data as object || {}), isActive: true }).then(r => r.data),
 };
 export default staffScheduleApi;

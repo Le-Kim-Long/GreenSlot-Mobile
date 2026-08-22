@@ -24,4 +24,16 @@ export const authApi = {
 
   forgotPassword: (data: { email: string }) =>
     apiClient.post('/auth/forgot-password', data).then(r => r.data),
+
+  verifyOtp: (data: { email: string; otp: string }) =>
+    apiClient.post('/auth/verify-otp', data).then(r => r.data),
+
+  resendOtp: (email: string) =>
+    apiClient.post('/auth/resend-otp', { email }).then(r => r.data),
+
+  resetPassword: (data: { token: string; newPassword: string }) =>
+    apiClient.post('/auth/reset-password', data).then(r => r.data),
+
+  googleLogin: (data: { idToken: string }): Promise<JwtResponse> =>
+    apiClient.post('/auth/google', data).then(r => r.data),
 };

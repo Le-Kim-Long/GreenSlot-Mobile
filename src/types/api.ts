@@ -21,6 +21,9 @@ export interface ProfileResponseDTO {
   fullName: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
+  locationId?: number;
+  locationName?: string;
   roles: string[];
 }
 
@@ -28,6 +31,7 @@ export interface UserProfileUpdateDTO {
   fullName?: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
 }
 
 export interface MessageResponseDTO {
@@ -52,6 +56,39 @@ export interface AvailableSlotResponseDTO {
   pillarCode: string;
   locationName: string;
   imageUrl?: string;
+  pillarCodes?: string[];
+  pillarCount?: number;
+  locationId?: number;
+  locationAddress?: string;
+  area?: number;
+  maxPillars?: number;
+  pillars?: PillarDetailDTO[];
+  totalHoles?: number;
+  calculatedPillarsPrice?: number;
+  calculatedTreesPrice?: number;
+}
+
+export interface PillarDetailDTO {
+  id: number;
+  pillarCode: string;
+  status?: string;
+  pillarType?: string;
+  pillarTypeName?: string;
+  capacityHoles?: number;
+  price?: number;
+  requiredArea?: number;
+  defaultTreeId?: number;
+  defaultTreeName?: string;
+  defaultTreePrice?: number;
+  defaultTreeImageUrl?: string;
+  cameraStreamUrl?: string;
+  cameraStatus?: string;
+  locationId?: number;
+  locationName?: string;
+  slotId?: number;
+  slotNumber?: string;
+  isRented?: boolean;
+  isAvailable?: boolean;
 }
 
 export interface BookingRequestDTO {
@@ -59,6 +96,13 @@ export interface BookingRequestDTO {
   durationInMonths: number;
   startTime: string;
   isMobile?: boolean;
+  mobileRedirectUrl?: string;
+  pillarIds?: number[];
+  treeId?: number;
+  treeIds?: number[];
+  smallPillarsCount?: number;
+  mediumPillarsCount?: number;
+  largePillarsCount?: number;
 }
 
 export interface BookingResponseDTO {
@@ -71,6 +115,7 @@ export interface ExtensionRequestDTO {
   rentalId: number;
   durationInMonths: number;
   isMobile?: boolean;
+  mobileRedirectUrl?: string;
 }
 
 export interface PaymentTransactionInfo {
@@ -91,6 +136,11 @@ export interface RentalHistoryDTO {
   endTime: string;
   rentalStatus: string;
   transactions: PaymentTransactionInfo[];
+  treeName?: string;
+  harvestNotifiedAt?: string;
+  harvestDecision?: string;
+  plantedAt?: string;
+  expectedHarvestAt?: string;
 }
 
 export interface ServiceRequestDTO {
@@ -450,6 +500,9 @@ export interface BookingHistory {
   status: string;
   paymentStatus?: string;
   transactions: PaymentTransactionInfo[];
+  harvestNotifiedAt?: string;
+  harvestDecision?: string;
+  treeName?: string;
 }
 
 export type ServiceType = ServiceTypeDTO;
