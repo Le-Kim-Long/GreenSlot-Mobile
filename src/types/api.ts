@@ -54,6 +54,8 @@ export interface AvailableSlotResponseDTO {
   price: number;
   status: string;
   pillarCode: string;
+  pillarCodes?: string[];
+  pillarCount?: number;
   locationName: string;
   imageUrl?: string;
   pillarCodes?: string[];
@@ -130,6 +132,14 @@ export interface RentalHistoryDTO {
   rentalId: number;
   slotNumber: string;
   pillarCode?: string;
+  pillarCodes?: string[];
+  pillars?: {
+    id: number;
+    pillarCode: string;
+    status: string;
+    cameraStreamUrl?: string;
+    cameraStatus?: string;
+  }[];
   locationName?: string;
   locationAddress?: string;
   startTime: string;
@@ -214,11 +224,18 @@ export interface SensorThreshold {
 export interface AlertDTO {
   id: number;
   alertType: string;
-  severity: string;
-  message: string;
+  severity?: string;
+  message?: string;
+  description?: string;
   status: string;
+  thresholdValue?: number;
+  actualValue?: number;
   pillarId?: number;
   pillarCode?: string;
+  gardenSlotId?: number;
+  slotNumber?: string;
+  treeId?: number;
+  treeName?: string;
   deviceId?: string;
   sensorType?: string;
   readingValue?: number;
@@ -490,6 +507,14 @@ export interface BookingHistory {
   slotId?: number;
   slotNumber: string;
   pillarCode?: string;
+  pillarCodes?: string[];
+  pillars?: {
+    id: number;
+    pillarCode: string;
+    status: string;
+    cameraStreamUrl?: string;
+    cameraStatus?: string;
+  }[];
   locationName?: string;
   locationAddress?: string;
   startDate: string;

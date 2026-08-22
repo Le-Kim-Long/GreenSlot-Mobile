@@ -3,6 +3,19 @@ import type { SensorReadingResponseDTO } from '../types/api';
 
 export const IOT_DEVICE_ID = 'ESP32_GARDEN_01';
 
+export interface SlotDeviceInfo {
+  slotId: number;
+  slotNumber: string;
+  deviceId: string;
+  pillarId: number;
+  pillarCode: string;
+  deviceStatus: string;
+  cameraStatus: string;
+  cameraStreamUrl: string;
+  locationId: number | null;
+  locationName: string;
+}
+
 export const iotApi = {
   getLatestReadings: (params: { deviceId?: string; pillarId?: number; slotId?: number } = {}): Promise<SensorReadingResponseDTO[]> =>
     apiClient.get('/iot/sensors/latest', { params: { deviceId: IOT_DEVICE_ID, ...params } }).then((r) => r.data),

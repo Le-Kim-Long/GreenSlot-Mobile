@@ -36,6 +36,16 @@ export const alertApi = {
     return response.data;
   },
 
+  getAlertsByTree: async (treeId: number): Promise<AlertDTO[]> => {
+    const response = await apiClient.get(`/alerts/tree/${treeId}`);
+    return response.data;
+  },
+
+  getAlertsBySlot: async (slotId: number): Promise<AlertDTO[]> => {
+    const response = await apiClient.get(`/alerts/slot/${slotId}`);
+    return response.data;
+  },
+
   getAlertProcessingLogs: async (alertId: number): Promise<AlertProcessingLogDTO[]> => {
     const response = await apiClient.get(`/alerts/${alertId}/logs`);
     return response.data;

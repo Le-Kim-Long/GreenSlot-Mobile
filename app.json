@@ -30,7 +30,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiUrl": "https://greenslot-backend.onrender.com/api"
+      "apiUrl": "http://10.10.10.254:8080/api"
     },
     "plugins": [
       "expo-font",
