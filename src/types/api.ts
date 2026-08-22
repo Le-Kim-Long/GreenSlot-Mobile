@@ -1,4 +1,14 @@
-export type UserRole = 'customer' | 'garden_staff' | 'location_manager' | 'manager' | 'admin' | 'ROLE_CUSTOMER' | 'ROLE_GARDEN_STAFF' | 'ROLE_LOCATION_MANAGER' | 'ROLE_MANAGER' | 'ROLE_ADMIN';
+export type UserRole =
+  | 'customer'
+  | 'garden_staff'
+  | 'location_manager'
+  | 'manager'
+  | 'admin'
+  | 'ROLE_CUSTOMER'
+  | 'ROLE_GARDEN_STAFF'
+  | 'ROLE_LOCATION_MANAGER'
+  | 'ROLE_MANAGER'
+  | 'ROLE_ADMIN';
 
 export interface User {
   id: string | number;
@@ -58,8 +68,6 @@ export interface AvailableSlotResponseDTO {
   pillarCount?: number;
   locationName: string;
   imageUrl?: string;
-  pillarCodes?: string[];
-  pillarCount?: number;
   locationId?: number;
   locationAddress?: string;
   area?: number;
@@ -327,18 +335,18 @@ export interface TreePlantingRequestCreateDTO {
 export interface TreePlantingRequestDTO {
   id: number;
   rentalId: number;
-  slotId?: number;            // alias used in older mapping
+  slotId?: number; // alias used in older mapping
   slotNumber: string;
   newTreeId: number;
   newTreeName: string;
-  treeName?: string;          // alias for newTreeName (mobile display)
+  treeName?: string; // alias for newTreeName (mobile display)
   requestedById: number;
   requestedByName: string;
-  userName?: string;          // alias for requestedByName (mobile display)
+  userName?: string; // alias for requestedByName (mobile display)
   status: string;
   reason: string;
   notes?: string;
-  rejectReason?: string;      // populated by backend when status=REJECTED
+  rejectReason?: string; // populated by backend when status=REJECTED
   requestedAt: string;
   processedAt?: string;
   processedById?: number;
@@ -538,5 +546,3 @@ export type ServiceRequest = ServiceRequestDTO;
 export type BookingRequest = BookingRequestDTO;
 export type BookingResponse = BookingResponseDTO;
 export type ExtensionRequest = ExtensionRequestDTO;
-
-
