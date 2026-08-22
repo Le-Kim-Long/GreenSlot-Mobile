@@ -121,14 +121,14 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
   const currentEndDate = useMemo(() => parseToDate(rental.endDate), [rental.endDate]);
   const newEndDate = useMemo(() => addMonthsToDate(currentEndDate, selectedMonths), [currentEndDate, selectedMonths]);
-  const pricePerMonth = useMemo(() => rental.totalPrice / Math.max(1,
+  const pricePerMonth = useMemo(() => rental.monthlyPrice ?? rental.totalPrice / Math.max(1,
     (() => {
       const start = parseToDate(rental.startDate);
       const end = parseToDate(rental.endDate);
       const diffMs = end.getTime() - start.getTime();
       return Math.max(1, Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)));
     })()
-  ), [rental]);
+  ), [rental.monthlyPrice, rental.totalPrice, rental.startDate, rental.endDate]);
   const extensionCost = pricePerMonth * selectedMonths;
 
   const handleExtend = async () => {
@@ -151,7 +151,11 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               if (result.paymentUrl) {
                 const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
                 const callback = 'callback' in settled ? settled.callback : undefined;
-                navigation.navigate('PaymentResult', { status: settled.status, rentalId: rental.id, slotNumber: rental.slotNumber, amount: callback?.amount, txnRef: callback?.txnRef, orderInfo: callback?.orderInfo });
+                if (settled.status === 'success' && settled.rental) {
+                  navigation.replace('RentalDetail', { rental: settled.rental });
+                } else {
+                  navigation.navigate('PaymentResult', { status: settled.status, rentalId: rental.id, slotNumber: rental.slotNumber, amount: callback?.amount, txnRef: callback?.txnRef, orderInfo: callback?.orderInfo });
+                }
               }
             } catch (e: unknown) {
               const err = e as { response?: { data?: { message?: string } } };

@@ -43,10 +43,21 @@ export async function openPaymentSession(paymentUrl: string): Promise<PaymentCal
 
 export async function waitForPayment(getHistory: () => Promise<any[]>, rentalId: number, attempts = 60) {
   for (let i = 0; i < attempts; i += 1) {
-    const history = await getHistory();
-    const rental = history.find(item => Number(item.id ?? item.rentalId) === rentalId);
-    const transaction = rental?.transactions?.find((tx: any) => tx.status === 'SUCCESS' || tx.status === 'PAID');
-    if (rental?.status === 'ACTIVE' || transaction) return { rental, status: 'success' as const };
+    try {
+      const history = await getHistory();
+      const rental = history.find(item => String(item.id ?? item.rentalId) === String(rentalId));
+      const rentalStatus = String(rental?.status ?? '').toUpperCase();
+      const paymentStatus = String(rental?.paymentStatus ?? '').toUpperCase();
+      const transaction = rental?.transactions?.find((tx: any) => {
+        const status = String(tx?.status ?? '').toUpperCase();
+        return status === 'SUCCESS' || status === 'PAID' || status === 'COMPLETED';
+      });
+      if (rentalStatus === 'ACTIVE' || paymentStatus === 'SUCCESS' || transaction) {
+        return { rental, status: 'success' as const };
+      }
+    } catch {
+      // Keep polling: the callback can arrive before the API is immediately ready.
+    }
     if (i < attempts - 1) await new Promise(resolve => setTimeout(resolve, 1500));
   }
   return { rental: undefined, status: 'pending' as const };

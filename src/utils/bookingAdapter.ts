@@ -23,6 +23,7 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     startTime: dto.startTime,
     endTime: dto.endTime,
     totalPrice,
+    monthlyPrice: dto.monthlyPrice,
     status: dto.rentalStatus,
     paymentStatus: paidTx?.status || latestTx?.status,
     transactions: dto.transactions ?? [],

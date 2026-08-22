@@ -153,6 +153,7 @@ export interface RentalHistoryDTO {
   startTime: string;
   endTime: string;
   rentalStatus: string;
+  monthlyPrice?: number;
   transactions: PaymentTransactionInfo[];
   treeName?: string;
   harvestNotifiedAt?: string;
@@ -530,6 +531,7 @@ export interface BookingHistory {
   startTime?: string;
   endTime?: string;
   totalPrice: number;
+  monthlyPrice?: number;
   status: string;
   paymentStatus?: string;
   transactions: PaymentTransactionInfo[];

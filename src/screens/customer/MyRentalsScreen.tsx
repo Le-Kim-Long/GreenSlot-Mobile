@@ -91,14 +91,18 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
       if (result.paymentUrl) {
         const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
         const callback = 'callback' in settled ? settled.callback : undefined;
-        navigation.navigate('PaymentResult', {
-          status: settled.status,
-          rentalId: rental.id,
-          slotNumber: rental.slotNumber,
-          amount: callback?.amount,
-          txnRef: callback?.txnRef,
-          orderInfo: callback?.orderInfo,
-        });
+        if (settled.status === 'success' && settled.rental) {
+          navigation.replace('RentalDetail', { rental: settled.rental });
+        } else {
+          navigation.navigate('PaymentResult', {
+            status: settled.status,
+            rentalId: rental.id,
+            slotNumber: rental.slotNumber,
+            amount: callback?.amount,
+            txnRef: callback?.txnRef,
+            orderInfo: callback?.orderInfo,
+          });
+        }
       } else {
         Alert.alert('Thông báo', 'Không tìm thấy link thanh toán. Vui lòng thử lại sau.');
       }
