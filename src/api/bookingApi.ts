@@ -33,4 +33,8 @@ export const bookingApi = {
 
   repayBooking: (rentalId: number): Promise<BookingResponseDTO> =>
     apiClient.get<BookingResponseDTO>(`/bookings/${rentalId}/pay?isMobile=true`).then(r => r.data),
+
+  // Khách hàng ghi nhận quyết định thu hoạch (Tự hái hoặc nhờ nhân viên)
+  recordHarvestDecision: (rentalId: number, decision: 'SELF' | 'STAFF'): Promise<void> =>
+    apiClient.post(`/bookings/${rentalId}/harvest-decision`, { decision }).then(() => undefined),
 };

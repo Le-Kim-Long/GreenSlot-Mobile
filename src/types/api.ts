@@ -44,23 +44,63 @@ export interface JwtResponse {
   roles: string[];
 }
 
+export interface PillarDetail {
+  id: number;
+  pillarCode: string;
+  status: string;
+  pillarType?: string;
+  pillarTypeName?: string;
+  capacityHoles?: number;
+  price?: number;
+  requiredArea?: number;
+  defaultTreeId?: number;
+  defaultTreeName?: string;
+  defaultTreePrice?: number;
+  defaultTreeImageUrl?: string;
+  cameraStreamUrl?: string;
+  cameraStatus?: string;
+  locationId?: number;
+  locationName?: string;
+  slotId?: number;
+  slotNumber?: string;
+  isRented?: boolean;
+  isAvailable?: boolean;
+}
+
+export type PillarInfo = PillarDetail;
+
 export interface AvailableSlotResponseDTO {
   id: number;
   slotNumber: string;
   price: number;
+  area?: number;
+  maxPillars?: number;
   status: string;
   pillarCode: string;
   pillarCodes?: string[];
   pillarCount?: number;
   locationName: string;
+  locationId?: number;
+  locationAddress?: string;
   imageUrl?: string;
+  pillars?: PillarDetail[];
+  totalHoles?: number;
+  calculatedPillarsPrice?: number;
+  calculatedTreesPrice?: number;
 }
 
 export interface BookingRequestDTO {
   slotId: number;
   durationInMonths: number;
   startTime: string;
+  treeId?: number;
+  treeIds?: number[];
+  pillarIds?: number[];
+  smallPillarsCount?: number;
+  mediumPillarsCount?: number;
+  largePillarsCount?: number;
   isMobile?: boolean;
+  mobileRedirectUrl?: string;
 }
 
 export interface BookingResponseDTO {
@@ -73,6 +113,7 @@ export interface ExtensionRequestDTO {
   rentalId: number;
   durationInMonths: number;
   isMobile?: boolean;
+  mobileRedirectUrl?: string;
 }
 
 export interface PaymentTransactionInfo {
@@ -85,22 +126,38 @@ export interface PaymentTransactionInfo {
 
 export interface RentalHistoryDTO {
   rentalId: number;
+  slotId?: number;
   slotNumber: string;
   pillarCode?: string;
   pillarCodes?: string[];
-  pillars?: {
-    id: number;
-    pillarCode: string;
-    status: string;
-    cameraStreamUrl?: string;
-    cameraStatus?: string;
-  }[];
+  pillars?: PillarDetail[];
   locationName?: string;
   locationAddress?: string;
   startTime: string;
   endTime: string;
   rentalStatus: string;
+  treeId?: number;
+  treeName?: string;
+  cropStatus?: string;
   transactions: PaymentTransactionInfo[];
+}
+
+export interface HarvestHistoryItem {
+  id: number;
+  rentalId: number;
+  locationId?: number;
+  locationName?: string;
+  slotId?: number;
+  slotNumber?: string;
+  treeId?: number;
+  treeName?: string;
+  customerId?: number;
+  customerName?: string;
+  harvestMethod: 'SELF' | 'STAFF';
+  staffId?: number;
+  staffName?: string;
+  plantedAt?: string;
+  harvestedAt: string;
 }
 
 export interface ServiceRequestDTO {
@@ -270,6 +327,7 @@ export interface TreeDTO {
 export interface TreePlantingRequestCreateDTO {
   rentalId: number;
   newTreeId: number;
+  targetPillarId?: number;
   reason: string;
   notes?: string;
 }
@@ -279,6 +337,8 @@ export interface TreePlantingRequestDTO {
   rentalId: number;
   slotId?: number;            // alias used in older mapping
   slotNumber: string;
+  targetPillarId?: number;
+  targetPillarCode?: string;
   newTreeId: number;
   newTreeName: string;
   treeName?: string;          // alias for newTreeName (mobile display)
@@ -288,6 +348,8 @@ export interface TreePlantingRequestDTO {
   status: string;
   reason: string;
   notes?: string;
+  price?: number;
+  paymentUrl?: string;
   rejectReason?: string;      // populated by backend when status=REJECTED
   requestedAt: string;
   processedAt?: string;
@@ -458,13 +520,7 @@ export interface BookingHistory {
   slotNumber: string;
   pillarCode?: string;
   pillarCodes?: string[];
-  pillars?: {
-    id: number;
-    pillarCode: string;
-    status: string;
-    cameraStreamUrl?: string;
-    cameraStatus?: string;
-  }[];
+  pillars?: PillarDetail[];
   locationName?: string;
   locationAddress?: string;
   startDate: string;
@@ -474,6 +530,9 @@ export interface BookingHistory {
   totalPrice: number;
   status: string;
   paymentStatus?: string;
+  treeId?: number;
+  treeName?: string;
+  cropStatus?: string;
   transactions: PaymentTransactionInfo[];
 }
 

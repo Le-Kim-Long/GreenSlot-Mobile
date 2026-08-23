@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -108,6 +108,30 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
       : tab === 'PENDING_PAYMENT'
       ? rentals.filter(r => r.status === 'PENDING_PAYMENT' || r.status === 'PENDING')
       : rentals.filter(r => r.status === tab);
+
+  // Hủy đơn thuê đang chờ thanh toán
+  const handleCancel = (rental: BookingHistory) => {
+    Alert.alert(
+      'Hủy đơn đặt vườn',
+      `Bạn có chắc chắn muốn hủy đơn thuê ô ${rental.slotNumber} này không?`,
+      [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy đơn',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await bookingApi.cancelBooking(rental.id);
+              Alert.alert('Thành công', 'Đã hủy đơn đặt vườn thành công.');
+              load();
+            } catch (err: any) {
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy đơn. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Tiếp tục thanh toán
   const handleRepay = async (rental: BookingHistory) => {
@@ -227,6 +251,21 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle}>{item.slotNumber}</Text>
                   <Text style={styles.cardSub}>{item.locationName}</Text>
+                  
+                  {item.treeName && (
+                    <Text style={styles.cardTree}>🌱 {item.treeName}</Text>
+                  )}
+
+                  {item.pillars && item.pillars.length > 0 && (
+                    <View style={styles.pillarsRow}>
+                      {item.pillars.map((p, idx) => (
+                        <View key={idx} style={styles.pillarBadge}>
+                          <Text style={styles.pillarBadgeText}>{p.pillarCode}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
                   {/* Full date range */}
                   <View style={styles.dateRow}>
                     <Text style={styles.cardDate}>📅 {item.startDate}</Text>
@@ -239,23 +278,33 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
 
               <Text style={styles.cardPrice}>{formatCurrency(item.totalPrice)}</Text>
 
-              {/* Tiếp tục thanh toán */}
+              {/* Action Buttons for Pending */}
               {isPendingPayment && (
-                <TouchableOpacity
-                  style={[styles.repayBtn, isRepaying && styles.repayBtnDisabled]}
-                  onPress={(e) => { e.stopPropagation?.(); !isRepaying && handleRepay(item); }}
-                  activeOpacity={0.8}
-                  disabled={isRepaying}
-                >
-                  {isRepaying ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <CreditCard size={16} color={colors.white} />
-                  )}
-                  <Text style={styles.repayBtnText}>
-                    {isRepaying ? 'Đang xử lý...' : 'Tiếp tục thanh toán'}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.actionButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.repayBtn, isRepaying && styles.repayBtnDisabled]}
+                    onPress={(e) => { e.stopPropagation?.(); !isRepaying && handleRepay(item); }}
+                    activeOpacity={0.8}
+                    disabled={isRepaying}
+                  >
+                    {isRepaying ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <CreditCard size={15} color={colors.white} />
+                    )}
+                    <Text style={styles.repayBtnText}>
+                      {isRepaying ? 'Đang xử lý...' : 'Thanh toán ngay'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={(e) => { e.stopPropagation?.(); handleCancel(item); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.cancelBtnText}>Hủy đơn</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {/* Gia hạn hint */}
@@ -389,22 +438,70 @@ const styles = StyleSheet.create({
 
   cardPrice: { ...typography.label, color: colors.green[600], marginBottom: spacing.sm },
 
+  cardTree: {
+    ...typography.caption,
+    color: colors.green[700],
+    fontFamily: 'Inter_600SemiBold',
+    marginTop: 2,
+  },
+  pillarsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  pillarBadge: {
+    backgroundColor: colors.green[50],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.green[200],
+  },
+  pillarBadgeText: {
+    fontSize: 10,
+    color: colors.green[800],
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+
   // Repay button
   repayBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     backgroundColor: ORANGE,
     borderRadius: radius.md,
-    paddingVertical: 12,
-    marginTop: spacing.xs,
+    paddingVertical: 10,
   },
   repayBtnDisabled: { opacity: 0.6 },
   repayBtnText: {
     ...typography.label,
+    fontSize: 12,
     color: colors.white,
     fontWeight: '700',
+  },
+
+  cancelBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontFamily: 'Inter_600SemiBold',
   },
 
   extendHint: {

@@ -12,10 +12,12 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sprout, Plus, Search, Calendar, ChevronRight, X, AlertCircle } from 'lucide-react-native';
+import * as Linking from 'expo-linking';
+import { Sprout, Plus, Search, Calendar, ChevronRight, X, AlertCircle, CreditCard, CheckCircle } from 'lucide-react-native';
 import { treeApi, treePlantingApi } from '../../api/treeApi';
 import { bookingApi } from '../../api/bookingApi';
-import type { TreeDTO, TreePlantingRequestDTO, BookingHistory } from '../../types/api';
+import type { TreeDTO, TreePlantingRequestDTO, BookingHistory, PillarDetail } from '../../types/api';
+import { formatCurrency } from '../../utils/bookingAdapter';
 import { colors } from '../../theme/colors';
 import { spacing, radius } from '../../theme/typography';
 
@@ -33,12 +35,14 @@ export default function CustomerTreePlantingScreen() {
   // Modal create
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedRental, setSelectedRental] = useState<BookingHistory | null>(null);
+  const [selectedPillar, setSelectedPillar] = useState<PillarDetail | null>(null);
   const [selectedTree, setSelectedTree] = useState<TreeDTO | null>(null);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
 
   // Selector modals
   const [isRentalSelectOpen, setIsRentalSelectOpen] = useState(false);
+  const [isPillarSelectOpen, setIsPillarSelectOpen] = useState(false);
   const [isTreeSelectOpen, setIsTreeSelectOpen] = useState(false);
 
   // Detail Modal
@@ -76,7 +80,7 @@ export default function CustomerTreePlantingScreen() {
     }
 
     // Kiểm tra thời gian sinh trưởng của cây so với thời hạn thuê còn lại
-    const growthDays = selectedTree.growthDurationDays || selectedTree.harvestDays || (selectedTree as any).growthDays || 0;
+    const growthDays = selectedTree.growthDurationDays || selectedTree.harvestDays || (selectedTree as any).growthTimeDays || (selectedTree as any).growthDays || 0;
     if (growthDays > 0 && (selectedRental.endDate || (selectedRental as any).endTime)) {
       const endStr = selectedRental.endDate || (selectedRental as any).endTime;
       const end = new Date(endStr).getTime();
@@ -94,19 +98,41 @@ export default function CustomerTreePlantingScreen() {
 
     setIsSubmitting(true);
     try {
-      await treePlantingApi.createRequest({
+      const response = await treePlantingApi.createRequest({
         rentalId: selectedRental.id,
+        targetPillarId: selectedPillar?.id,
         newTreeId: selectedTree.id!,
         reason: reason.trim(),
         notes: notes.trim() || undefined,
       });
-      Alert.alert('Thành công', 'Đã gửi yêu cầu trồng cây của bạn đến nhà vườn.');
-      setIsCreateOpen(false);
+
+      if (response.paymentUrl) {
+        Alert.alert(
+          'Thanh toán giống cây',
+          'Yêu cầu đã được tạo. Bạn sẽ được chuyển đến VNPay để hoàn tất thanh toán tiền giống rau.',
+          [
+            { text: 'Để sau', onPress: () => { setIsCreateOpen(false); fetchData(); } },
+            {
+              text: 'Thanh toán ngay',
+              onPress: async () => {
+                setIsCreateOpen(false);
+                fetchData();
+                await Linking.openURL(response.paymentUrl!);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Thành công', 'Đã gửi yêu cầu trồng cây của bạn đến nhà vườn.');
+        setIsCreateOpen(false);
+        fetchData();
+      }
+
       setSelectedRental(null);
+      setSelectedPillar(null);
       setSelectedTree(null);
       setReason('');
       setNotes('');
-      fetchData();
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || 'Không thể gửi yêu cầu. Vui lòng thử lại sau.';
       Alert.alert('Thất bại', errorMsg);
@@ -119,6 +145,8 @@ export default function CustomerTreePlantingScreen() {
     switch (status) {
       case 'APPROVED':
         return { bg: colors.green[50], txt: colors.green[700], label: 'Đã duyệt' };
+      case 'PENDING_PAYMENT':
+        return { bg: '#fff7ed', txt: '#ea580c', label: 'Chờ thanh toán' };
       case 'REJECTED':
         return { bg: '#fee2e2', txt: '#dc2626', label: 'Từ chối' };
       default:
@@ -130,6 +158,7 @@ export default function CustomerTreePlantingScreen() {
     const matchSearch =
       r.slotNumber?.toLowerCase().includes(search.toLowerCase()) ||
       r.treeName?.toLowerCase().includes(search.toLowerCase()) ||
+      r.newTreeName?.toLowerCase().includes(search.toLowerCase()) ||
       r.reason?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'ALL' ? true : r.status === statusFilter;
     return matchSearch && matchStatus;
@@ -180,26 +209,44 @@ export default function CustomerTreePlantingScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => {
             const status = getStatusStyle(item.status);
+            const isPendingPay = item.status === 'PENDING_PAYMENT' || Boolean(item.paymentUrl);
+
             return (
               <TouchableOpacity style={styles.card} onPress={() => setSelectedDetail(item)}>
                 <View style={styles.cardHeader}>
                   <View style={styles.slotBadge}>
                     <Sprout size={16} color={colors.green[600]} />
-                    <Text style={styles.slotText}>{item.slotNumber || `Slot #${item.rentalId}`}</Text>
+                    <Text style={styles.slotText}>
+                      {item.slotNumber || `Slot #${item.rentalId}`}
+                      {item.targetPillarCode ? ` · Trụ ${item.targetPillarCode}` : ''}
+                    </Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
                     <Text style={[styles.statusText, { color: status.txt }]}>{status.label}</Text>
                   </View>
                 </View>
 
-                <Text style={styles.treeNameText}>Cây trồng: {item.treeName}</Text>
+                <Text style={styles.treeNameText}>🌱 Cây trồng: {item.newTreeName || item.treeName}</Text>
                 <Text style={styles.reasonText} numberOfLines={2}>
                   Lý do: {item.reason}
                 </Text>
 
+                {isPendingPay && item.paymentUrl && (
+                  <TouchableOpacity
+                    style={styles.payNowBtn}
+                    onPress={async (e) => {
+                      e.stopPropagation?.();
+                      await Linking.openURL(item.paymentUrl!);
+                    }}
+                  >
+                    <CreditCard size={14} color={colors.white} />
+                    <Text style={styles.payNowBtnText}>Thanh toán VNPay</Text>
+                  </TouchableOpacity>
+                )}
+
                 <View style={styles.cardFooter}>
                   <Text style={styles.dateText}>
-                    Ngày yêu cầu: {new Date(item.requestedAt).toLocaleDateString('vi-VN')}
+                    Ngày gửi: {new Date(item.requestedAt).toLocaleDateString('vi-VN')}
                   </Text>
                   <ChevronRight size={16} color={colors.gray[400]} />
                 </View>
@@ -228,18 +275,30 @@ export default function CustomerTreePlantingScreen() {
 
             <ScrollView contentContainerStyle={styles.formContainer}>
               {/* Select Rental */}
-              <Text style={styles.label}>Chọn Ô đất đang thuê *</Text>
+              <Text style={styles.label}>Chọn Ô vườn đang thuê *</Text>
               <TouchableOpacity style={styles.selector} onPress={() => setIsRentalSelectOpen(true)}>
                 <Text style={{ color: selectedRental ? colors.gray[900] : colors.gray[400] }}>
-                  {selectedRental ? selectedRental.slotNumber : 'Nhấp để chọn ô đất'}
+                  {selectedRental ? `Ô ${selectedRental.slotNumber} (${selectedRental.locationName || 'Nhà vườn'})` : 'Nhấp để chọn ô đất'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Select Pillar if available */}
+              {selectedRental && selectedRental.pillars && selectedRental.pillars.length > 0 && (
+                <>
+                  <Text style={styles.label}>Chọn Trụ canh tác cụ thể</Text>
+                  <TouchableOpacity style={styles.selector} onPress={() => setIsPillarSelectOpen(true)}>
+                    <Text style={{ color: selectedPillar ? colors.gray[900] : colors.gray[400] }}>
+                      {selectedPillar ? `Trụ ${selectedPillar.pillarCode} (${selectedPillar.capacityHoles || 24} hốc)` : 'Mặc định hoặc chọn trụ'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
 
               {/* Select Tree */}
               <Text style={styles.label}>Chọn Giống cây muốn trồng *</Text>
               <TouchableOpacity style={styles.selector} onPress={() => setIsTreeSelectOpen(true)}>
                 <Text style={{ color: selectedTree ? colors.gray[900] : colors.gray[400] }}>
-                  {selectedTree ? selectedTree.treeName : 'Nhấp để chọn giống cây'}
+                  {selectedTree ? `🌱 ${selectedTree.treeName || (selectedTree as any).name}` : 'Nhấp để chọn giống cây'}
                 </Text>
               </TouchableOpacity>
 
@@ -247,7 +306,7 @@ export default function CustomerTreePlantingScreen() {
               <Text style={styles.label}>Lý do trồng / thay thế cây *</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="VD: Cây cũ đã hết vụ, muốn đổi giống cây..."
+                placeholder="VD: Cây cũ đã hết vụ, muốn đổi giống cây mới..."
                 multiline
                 numberOfLines={3}
                 value={reason}
@@ -308,9 +367,18 @@ export default function CustomerTreePlantingScreen() {
                   <Text style={styles.detailValue}>{selectedDetail.slotNumber}</Text>
                 </View>
 
+                {selectedDetail.targetPillarCode && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Trụ canh tác:</Text>
+                    <Text style={styles.detailValue}>Trụ {selectedDetail.targetPillarCode}</Text>
+                  </View>
+                )}
+
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Giống cây:</Text>
-                  <Text style={styles.detailValue}>{selectedDetail.treeName}</Text>
+                  <Text style={[styles.detailValue, { color: colors.green[700], fontWeight: '700' }]}>
+                    🌱 {selectedDetail.newTreeName || selectedDetail.treeName}
+                  </Text>
                 </View>
 
                 <View style={styles.detailRow}>
@@ -328,12 +396,25 @@ export default function CustomerTreePlantingScreen() {
                   ) : null}
                 </View>
 
+                {/* Thanh toán VNPay nếu cần */}
+                {selectedDetail.paymentUrl && (
+                  <TouchableOpacity
+                    style={[styles.payNowBtn, { marginVertical: spacing.md, paddingVertical: 12 }]}
+                    onPress={async () => {
+                      await Linking.openURL(selectedDetail.paymentUrl!);
+                    }}
+                  >
+                    <CreditCard size={16} color={colors.white} />
+                    <Text style={styles.payNowBtnText}>Tiến hành thanh toán giống rau (VNPay)</Text>
+                  </TouchableOpacity>
+                )}
+
                 {/* Phản hồi nhà vườn */}
                 <Text style={styles.detailSectionHeader}>Phản hồi từ Nhà vườn:</Text>
                 {selectedDetail.status === 'PENDING' ? (
                   <View style={styles.pendingBox}>
                     <AlertCircle size={16} color="#d97706" />
-                    <Text style={styles.pendingText}>Đang chờ bộ phận kỹ thuật xem xét thổ nhưỡng.</Text>
+                    <Text style={styles.pendingText}>Đang chờ bộ phận kỹ thuật xem xét và gieo mầm.</Text>
                   </View>
                 ) : (
                   <View
@@ -377,15 +458,50 @@ export default function CustomerTreePlantingScreen() {
                   style={styles.pickerItem}
                   onPress={() => {
                     setSelectedRental(item);
+                    setSelectedPillar(null);
                     setIsRentalSelectOpen(false);
                   }}
                 >
-                  <Text style={styles.pickerItemText}>{item.slotNumber} ({item.locationName})</Text>
+                  <Text style={styles.pickerItemText}>Ô {item.slotNumber} ({item.locationName})</Text>
                 </TouchableOpacity>
               )}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Text style={{ color: colors.gray[500], padding: 20 }}>Bạn không có ô đất nào đang thuê.</Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* PILLAR PICKER */}
+      <Modal visible={isPillarSelectOpen} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.pickerBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn trụ canh tác</Text>
+              <TouchableOpacity onPress={() => setIsPillarSelectOpen(false)}>
+                <X size={20} color={colors.gray[900]} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={selectedRental?.pillars || []}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    setSelectedPillar(item);
+                    setIsPillarSelectOpen(false);
+                  }}
+                >
+                  <Text style={styles.pickerItemText}>Trụ {item.pillarCode} ({item.capacityHoles || 24} hốc)</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Text style={{ color: colors.gray[500], padding: 20 }}>Không có thông tin trụ cụ thể.</Text>
                 </View>
               }
             />
@@ -414,8 +530,10 @@ export default function CustomerTreePlantingScreen() {
                     setIsTreeSelectOpen(false);
                   }}
                 >
-                  <Text style={styles.pickerItemText}>{item.treeName}</Text>
-                  <Text style={styles.pickerItemSub}>{item.scientificName}</Text>
+                  <Text style={styles.pickerItemText}>🌱 {item.treeName || (item as any).name}</Text>
+                  {item.price ? (
+                    <Text style={styles.pickerItemSub}>Giá giống: {formatCurrency(item.price)}</Text>
+                  ) : null}
                 </TouchableOpacity>
               )}
             />
@@ -728,5 +846,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.gray[500],
     marginTop: 2,
+  },
+  payNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ea580c',
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    marginVertical: spacing.xs,
+  },
+  payNowBtnText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
   },
 });

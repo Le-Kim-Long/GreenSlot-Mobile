@@ -9,6 +9,7 @@ import PaymentHistoryScreen from '../screens/customer/PaymentHistoryScreen';
 import CustomerDashboardScreen from '../screens/customer/CustomerDashboardScreen';
 import CustomerNotificationsScreen from '../screens/customer/CustomerNotificationsScreen';
 import CustomerTreePlantingScreen from '../screens/customer/CustomerTreePlantingScreen';
+import CustomerHarvestHistoryScreen from '../screens/customer/CustomerHarvestHistoryScreen';
 import PaymentResultScreen from '../screens/customer/PaymentResultScreen';
 import type { CustomerStackParamList } from './types';
 
@@ -30,9 +31,10 @@ export function CustomerStack() {
       <Stack.Screen name="IoTMonitoring" component={IoTMonitoringScreen} options={{ title: 'Giám sát IoT' }} />
       <Stack.Screen name="CareServices" component={CareServicesScreen} options={{ title: 'Dịch vụ chăm sóc' }} />
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Lịch sử thanh toán' }} />
-      <Stack.Screen name="CustomerDashboard" component={CustomerDashboardScreen} options={{ title: 'Dashboard' }} />
+      <Stack.Screen name="CustomerDashboard" component={CustomerDashboardScreen} options={{ title: 'Bảng điều khiển' }} />
       <Stack.Screen name="Notifications" component={CustomerNotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="CustomerTreePlanting" component={CustomerTreePlantingScreen} options={{ title: 'Yêu cầu trồng cây' }} />
+      <Stack.Screen name="CustomerHarvestHistory" component={CustomerHarvestHistoryScreen} options={{ title: 'Lịch sử thu hoạch' }} />
       <Stack.Screen name="PaymentResult" component={PaymentResultScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );

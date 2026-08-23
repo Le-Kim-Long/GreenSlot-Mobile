@@ -26,6 +26,7 @@ export type CustomerStackParamList = {
   CustomerDashboard: undefined;
   Notifications: undefined;
   CustomerTreePlanting: undefined;
+  CustomerHarvestHistory: undefined;
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
     rentalId?: number;

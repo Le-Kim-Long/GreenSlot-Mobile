@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import {
   type AppStateStatus,
 } from 'react-native';
 import * as Linking from 'expo-linking';
-import { Leaf, MapPin, Calendar, ChevronLeft, ChevronRight, X, CheckCircle } from 'lucide-react-native';
+import { Leaf, MapPin, Calendar, ChevronLeft, ChevronRight, X, CheckCircle, Sprout } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
+import { treeApi } from '../../api/treeApi';
+import type { TreeDTO, PillarInfo } from '../../types/api';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -173,9 +175,61 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
   const [pickerVisible, setPickerVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
 
+  // Trees and Pillars state
+  const [trees, setTrees] = useState<TreeDTO[]>([]);
+  const [selectedTreeForModalPillarId, setSelectedTreeForModalPillarId] = useState<number | null>(null);
+  const [treeModalVisible, setTreeModalVisible] = useState(false);
+
+  // Resolve available pillars for this slot
+  const availablePillars: PillarInfo[] = useMemo(() => {
+    if (slot.pillars && slot.pillars.length > 0) {
+      return slot.pillars;
+    }
+    if (slot.pillarCodes && slot.pillarCodes.length > 0) {
+      return slot.pillarCodes.map((code, idx) => ({
+        id: ((slot as any).pillarId || slot.id * 100) + idx,
+        pillarCode: code,
+        capacityHoles: 24,
+        status: 'AVAILABLE',
+      }));
+    }
+    return [{
+      id: (slot as any).pillarId || slot.id,
+      pillarCode: slot.pillarCode || 'P-01',
+      capacityHoles: 24,
+      status: 'AVAILABLE',
+    }];
+  }, [slot]);
+
+  // Selected pillar IDs (default all available pillars)
+  const [selectedPillarIds, setSelectedPillarIds] = useState<number[]>(() =>
+    availablePillars.map(p => p.id)
+  );
+
+  // Mapping pillarId -> treeId
+  const [pillarTreeSelections, setPillarTreeSelections] = useState<{ [pillarId: number]: number }>({});
+
   // AppState ref để phát hiện khi user quay về app sau khi thanh toán
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const pendingPaymentRef = useRef<boolean>(false);
+
+  // Load active trees on mount
+  useEffect(() => {
+    treeApi.getActiveTrees()
+      .then(data => {
+        setTrees(data);
+        if (data.length > 0 && data[0].id != null) {
+          // Set default tree for all pillars
+          const firstTreeId = data[0].id;
+          const defaultMap: { [pillarId: number]: number } = {};
+          availablePillars.forEach(p => {
+            defaultMap[p.id] = firstTreeId;
+          });
+          setPillarTreeSelections(defaultMap);
+        }
+      })
+      .catch(() => setTrees([]));
+  }, [availablePillars]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -185,7 +239,40 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
 
   const [startDate, setStartDate] = useState<Date>(today);
   const endDate = useMemo(() => addMonths(startDate, selectedMonths), [startDate, selectedMonths]);
-  const totalEstimate = slot.price * selectedMonths;
+
+  // Toggle single pillar selection
+  const togglePillar = (pillarId: number) => {
+    setSelectedPillarIds(prev => {
+      if (prev.includes(pillarId)) {
+        if (prev.length <= 1) {
+          Alert.alert('Thông báo', 'Bạn phải chọn ít nhất 1 trụ để đặt thuê.');
+          return prev;
+        }
+        return prev.filter(id => id !== pillarId);
+      } else {
+        return [...prev, pillarId];
+      }
+    });
+  };
+
+  // Pricing calculations
+  const slotRentalCost = slot.price * selectedMonths;
+  
+  const totalTreeCost = useMemo(() => {
+    let cost = 0;
+    selectedPillarIds.forEach(pId => {
+      const p = availablePillars.find(item => item.id === pId);
+      const treeId = pillarTreeSelections[pId];
+      const tree = trees.find(t => t.id === treeId);
+      if (p && tree && tree.price) {
+        const holes = p.capacityHoles || 24;
+        cost += tree.price * (holes / 24.0);
+      }
+    });
+    return Math.round(cost);
+  }, [selectedPillarIds, availablePillars, pillarTreeSelections, trees]);
+
+  const totalEstimate = slotRentalCost + totalTreeCost;
 
   const isStartToday = isSameDay(startDate, today);
 
@@ -229,25 +316,36 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
   }, [slot.id, slot.slotNumber, navigation]);
 
   const handleBook = async () => {
+    if (selectedPillarIds.length === 0) {
+      Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 trụ canh tác.');
+      return;
+    }
+
     setLoading(true);
     try {
+      const selectedTreesList = selectedPillarIds.map(pId => pillarTreeSelections[pId]).filter(Boolean);
+      const primaryTreeId = selectedTreesList[0] || (trees[0]?.id ?? undefined);
+
       const result = await bookingApi.bookSlot({
         slotId: slot.id,
         durationInMonths: selectedMonths,
         startTime: startDate.toISOString(),
+        treeId: primaryTreeId,
+        treeIds: selectedTreesList,
+        pillarIds: selectedPillarIds,
         isMobile: true,
+        mobileRedirectUrl: 'greenslot://payment-result',
       });
 
       if (result.paymentUrl) {
         Alert.alert(
           'Chuyển đến thanh toán',
-          'Bạn sẽ được chuyển đến VNPay để hoàn tất thanh toán.',
+          'Bạn sẽ được chuyển đến cổng thanh toán VNPay an toàn.',
           [
             { text: 'Hủy', style: 'cancel' },
             {
-              text: 'Thanh toán',
+              text: 'Thanh toán ngay',
               onPress: async () => {
-                // Đánh dấu đang chờ kết quả thanh toán
                 pendingPaymentRef.current = true;
                 await Linking.openURL(result.paymentUrl);
               },
@@ -290,14 +388,14 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
           <View style={styles.infoRow}>
             <Leaf size={18} color={colors.green[600]} />
             <View>
-              <Text style={styles.infoLabel}>Cột vườn</Text>
-              <Text style={styles.infoValue}>{slot.pillarCode}</Text>
+              <Text style={styles.infoLabel}>Tổng số trụ khả dụng</Text>
+              <Text style={styles.infoValue}>{availablePillars.length} trụ</Text>
             </View>
           </View>
           <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
             <Calendar size={18} color={colors.green[600]} />
             <View>
-              <Text style={styles.infoLabel}>Trạng thái</Text>
+              <Text style={styles.infoLabel}>Trạng thái ô</Text>
               <Text style={styles.infoValue}>
                 {slot.status === 'AVAILABLE' ? 'Sẵn sàng thuê' : slot.status}
               </Text>
@@ -305,9 +403,89 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
           </View>
         </Card>
 
-        {/* Booking Card */}
+        {/* Pillar Selection Card */}
         <Card style={styles.bookCard}>
-          <Text style={styles.bookTitle}>Đặt thuê</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.bookTitle}>Chọn trụ & giống rau</Text>
+            <TouchableOpacity
+              onPress={() => setSelectedPillarIds(availablePillars.map(p => p.id))}
+            >
+              <Text style={styles.selectActionText}>Chọn tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.sectionSubDesc}>
+            Mỗi trụ tương ứng với 1 loại cây rau sạch. Bạn có thể chọn trồng các loại rau khác nhau trên từng trụ.
+          </Text>
+
+          {availablePillars.map(pillar => {
+            const isSelected = selectedPillarIds.includes(pillar.id);
+            const currentTreeId = pillarTreeSelections[pillar.id];
+            const currentTree = trees.find(t => t.id === currentTreeId);
+            const holes = pillar.capacityHoles || 24;
+            const treeCost = currentTree?.price ? Math.round(currentTree.price * (holes / 24.0)) : 0;
+
+            return (
+              <View
+                key={pillar.id}
+                style={[
+                  styles.pillarItemCard,
+                  isSelected && styles.pillarItemCardSelected,
+                ]}
+              >
+                {/* Pillar Header with Checkbox */}
+                <TouchableOpacity
+                  style={styles.pillarHeader}
+                  onPress={() => togglePillar(pillar.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                    {isSelected && <CheckCircle size={16} color={colors.white} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pillarTitle}>Trụ {pillar.pillarCode}</Text>
+                    <Text style={styles.pillarCapacity}>Sức chứa: {holes} hốc cây</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Tree Selector for this Pillar */}
+                {isSelected && (
+                  <View style={styles.treePickerBox}>
+                    <Text style={styles.treePickerLabel}>Giống rau trên trụ này:</Text>
+                    <TouchableOpacity
+                      style={styles.treePickerBtn}
+                      onPress={() => {
+                        setSelectedTreeForModalPillarId(pillar.id);
+                        setTreeModalVisible(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.treeSelectedName}>
+                          🌱 {currentTree?.treeName || (currentTree as any)?.name || 'Chọn giống rau'}
+                        </Text>
+                        {(currentTree?.growthDurationDays || (currentTree as any)?.growthTimeDays) && (
+                          <Text style={styles.treeGrowthText}>
+                            Thời gian sinh trưởng: ~{currentTree?.growthDurationDays || (currentTree as any)?.growthTimeDays} ngày
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.treePriceBadge}>
+                        <Text style={styles.treePriceBadgeText}>
+                          {treeCost > 0 ? `+${formatCurrency(treeCost)}` : 'Miễn phí'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </Card>
+
+        {/* Booking Duration & Date Card */}
+        <Card style={styles.bookCard}>
+          <Text style={styles.bookTitle}>Thời hạn thuê</Text>
 
           {/* ── Start Date Picker ── */}
           <Text style={styles.sectionLabel}>Ngày bắt đầu thuê</Text>
@@ -328,7 +506,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
           </TouchableOpacity>
 
           {/* ── Duration Picker ── */}
-          <Text style={styles.sectionLabel}>Thời hạn thuê</Text>
+          <Text style={styles.sectionLabel}>Thời gian thuê</Text>
           <TouchableOpacity
             style={styles.pickerButton}
             onPress={() => setPickerVisible(true)}
@@ -346,34 +524,111 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
           {/* Date Range Display */}
           <View style={styles.dateRangeCard}>
             <View style={styles.dateBlock}>
-              <Text style={styles.dateBlockLabel}>📅 Ngày bắt đầu</Text>
+              <Text style={styles.dateBlockLabel}>📅 Bắt đầu</Text>
               <Text style={styles.dateBlockValue}>{formatDate(startDate)}</Text>
             </View>
             <View style={styles.dateArrow}>
               <ChevronRight size={20} color={colors.green[400]} />
             </View>
             <View style={styles.dateBlock}>
-              <Text style={styles.dateBlockLabel}>🏁 Ngày kết thúc</Text>
+              <Text style={styles.dateBlockLabel}>🏁 Kết thúc</Text>
               <Text style={styles.dateBlockValue}>{formatDate(endDate)}</Text>
             </View>
           </View>
 
-          {/* Duration summary */}
-          <View style={styles.durationSummary}>
-            <Text style={styles.durationSummaryText}>
-              Tổng thời gian: <Text style={styles.durationHighlight}>{selectedMonths} tháng</Text>
-            </Text>
+          {/* Detailed Price Breakdown */}
+          <View style={styles.priceBreakdownBox}>
+            <Text style={styles.breakdownTitle}>Bảng chi tiết thanh toán</Text>
+
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>
+                Tiền thuê ô ({selectedMonths} tháng):
+              </Text>
+              <Text style={styles.breakdownValue}>{formatCurrency(slotRentalCost)}</Text>
+            </View>
+
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>
+                Phí giống cây ({selectedPillarIds.length} trụ):
+              </Text>
+              <Text style={styles.breakdownValue}>{formatCurrency(totalTreeCost)}</Text>
+            </View>
+
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Tổng cộng thanh toán</Text>
+              <Text style={styles.totalValue}>{formatCurrency(totalEstimate)}</Text>
+            </View>
           </View>
 
-          {/* Total */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tổng ước tính</Text>
-            <Text style={styles.totalValue}>{formatCurrency(totalEstimate)}</Text>
-          </View>
-
-          <Button title="Xác nhận & Thanh toán VNPay" onPress={handleBook} loading={loading} />
+          <Button
+            title={`Thanh toán VNPay (${formatCurrency(totalEstimate)})`}
+            onPress={handleBook}
+            loading={loading}
+          />
         </Card>
       </ScrollView>
+
+      {/* ════ Tree Selection Modal ════ */}
+      <Modal
+        visible={treeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTreeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn giống rau canh tác</Text>
+              <TouchableOpacity onPress={() => setTreeModalVisible(false)} style={styles.modalClose}>
+                <X size={22} color={colors.gray[600]} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={trees}
+              keyExtractor={(item, index) => (item.id ?? index).toString()}
+              contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}
+              renderItem={({ item }) => {
+                const isSelected = selectedTreeForModalPillarId != null &&
+                  pillarTreeSelections[selectedTreeForModalPillarId] === item.id;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.treeModalItem,
+                      isSelected && styles.treeModalItemSelected,
+                    ]}
+                    onPress={() => {
+                      if (selectedTreeForModalPillarId != null && item.id != null) {
+                        const targetTreeId = item.id;
+                        setPillarTreeSelections(prev => ({
+                          ...prev,
+                          [selectedTreeForModalPillarId]: targetTreeId,
+                        }));
+                      }
+                      setTreeModalVisible(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.treeModalItemName, isSelected && styles.treeModalItemNameSelected]}>
+                        🌱 {item.treeName || (item as any).name}
+                      </Text>
+                      {(item.growthDurationDays || (item as any).growthTimeDays) && (
+                        <Text style={styles.treeModalItemDesc}>
+                          Thời gian sinh trưởng: {item.growthDurationDays || (item as any).growthTimeDays} ngày
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.treeModalItemPrice, isSelected && styles.treeModalItemPriceSelected]}>
+                      {item.price ? formatCurrency(item.price) : '0 ₫'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* ════ Date Picker Modal ════ */}
       <Modal
@@ -435,7 +690,6 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
               contentContainerStyle={styles.monthGrid}
               renderItem={({ item }) => {
                 const isSelected = item === selectedMonths;
-                // Preview end date for this option (based on selected startDate)
                 const previewEnd = addMonths(startDate, item);
                 return (
                   <TouchableOpacity
@@ -772,5 +1026,190 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.green[700],
     flex: 1,
+  },
+
+  // Pillar and Tree Selection Styles
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  selectActionText: {
+    fontSize: 12,
+    color: colors.green[700],
+    fontFamily: 'Inter_600SemiBold',
+  },
+  sectionSubDesc: {
+    ...typography.caption,
+    color: colors.gray[500],
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  pillarItemCard: {
+    backgroundColor: colors.gray[50],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.gray[200],
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  pillarItemCardSelected: {
+    backgroundColor: colors.white,
+    borderColor: colors.green[500],
+    shadowColor: colors.green[600],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  pillarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.sm,
+    borderWidth: 2,
+    borderColor: colors.gray[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  checkboxSelected: {
+    backgroundColor: colors.green[600],
+    borderColor: colors.green[600],
+  },
+  pillarTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: colors.gray[900],
+  },
+  pillarCapacity: {
+    ...typography.caption,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  treePickerBox: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+  },
+  treePickerLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: colors.gray[500],
+    marginBottom: 4,
+  },
+  treePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.green[50],
+    borderWidth: 1,
+    borderColor: colors.green[200],
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  treeSelectedName: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[800],
+  },
+  treeGrowthText: {
+    fontSize: 10,
+    color: colors.gray[500],
+    marginTop: 2,
+    fontFamily: 'Inter_400Regular',
+  },
+  treePriceBadge: {
+    backgroundColor: colors.green[600],
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+  },
+  treePriceBadgeText: {
+    fontSize: 10,
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  // Price Breakdown Table
+  priceBreakdownBox: {
+    backgroundColor: colors.gray[50],
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  breakdownTitle: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: colors.green[800],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[200],
+    paddingBottom: 4,
+    marginBottom: 4,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  breakdownLabel: {
+    fontSize: 12,
+    color: colors.gray[600],
+    fontFamily: 'Inter_400Regular',
+  },
+  breakdownValue: {
+    fontSize: 12,
+    color: colors.gray[900],
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  // Tree Modal
+  treeModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.gray[50],
+    borderWidth: 1.5,
+    borderColor: colors.gray[200],
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  treeModalItemSelected: {
+    backgroundColor: colors.green[50],
+    borderColor: colors.green[600],
+  },
+  treeModalItemName: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.gray[900],
+  },
+  treeModalItemNameSelected: {
+    color: colors.green[800],
+  },
+  treeModalItemDesc: {
+    ...typography.caption,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  treeModalItemPrice: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[700],
+  },
+  treeModalItemPriceSelected: {
+    fontFamily: 'Inter_700Bold',
   },
 });

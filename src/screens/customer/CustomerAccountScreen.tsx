@@ -12,6 +12,7 @@ import {
   Sprout,
   Bell,
   UserX,
+  History,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { roleLabel } from '../../utils/roleMap';
@@ -31,6 +32,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
     { icon: Bell, label: 'Thông báo', screen: 'Notifications' as const },
     { icon: Wifi, label: 'Giám sát IoT', screen: 'IoTMonitoring' as const },
     { icon: Sprout, label: 'Yêu cầu trồng cây', screen: 'CustomerTreePlanting' as const },
+    { icon: History, label: 'Lịch sử thu hoạch', screen: 'CustomerHarvestHistory' as const },
     { icon: Wrench, label: 'Dịch vụ chăm sóc', screen: 'CareServices' as const },
     { icon: CreditCard, label: 'Lịch sử thanh toán', screen: 'PaymentHistory' as const },
   ];

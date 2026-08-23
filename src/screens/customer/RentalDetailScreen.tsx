@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   RotateCcw,
   Wrench,
+  Sprout,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { managerApi, taskApi } from '../../api/taskApi';
@@ -297,6 +298,60 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
     return () => sub.remove();
   }, [rental.id, rental.slotNumber]);
 
+  const [harvestSubmitting, setHarvestSubmitting] = useState(false);
+
+  const handleCancelBooking = () => {
+    Alert.alert(
+      'Hủy hợp đồng thuê',
+      `Bạn có chắc chắn muốn hủy đơn thuê ô vườn ${rental.slotNumber} này không?`,
+      [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy đơn',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await bookingApi.cancelBooking(rental.id);
+              Alert.alert('Thành công', 'Đã hủy đơn đặt vườn thành công.');
+              navigation.goBack();
+            } catch (err: any) {
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy đơn. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleHarvestDecision = async (decision: 'SELF' | 'STAFF') => {
+    Alert.alert(
+      'Xác nhận phương thức thu hoạch',
+      decision === 'SELF'
+        ? 'Bạn sẽ tự đến vườn để trải nghiệm thu hoạch rau của mình?'
+        : 'Bạn muốn nhân viên nhà vườn thu hoạch giúp và đóng gói gửi cho bạn?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận',
+          onPress: async () => {
+            setHarvestSubmitting(true);
+            try {
+              await bookingApi.recordHarvestDecision(rental.id, decision);
+              Alert.alert('Thành công', 'Đã ghi nhận lựa chọn thu hoạch của bạn!');
+              const history = await bookingApi.getHistory();
+              const updated = history.find(r => r.id === rental.id);
+              if (updated) setRental(updated);
+            } catch (err: any) {
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Ghi nhận thất bại. Vui lòng thử lại.');
+            } finally {
+              setHarvestSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleExtend = async () => {
     Alert.alert(
       'Xác nhận gia hạn',
@@ -355,6 +410,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
   const badge = statusToBadge(rental.status);
   const isActive = rental.status === 'ACTIVE';
+  const isPending = rental.status === 'PENDING' || rental.status === 'PENDING_PAYMENT';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -371,6 +427,37 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         </View>
 
+        {/* ── Harvest Decision Banner (nếu đang active) ─────────────────── */}
+        {isActive && (
+          <View style={[styles.card, styles.harvestCard]}>
+            <View style={styles.harvestHeader}>
+              <Sprout size={20} color={colors.green[700]} />
+              <Text style={styles.sectionTitle}>Phương thức thu hoạch nông sản</Text>
+            </View>
+            <Text style={styles.harvestSubtitle}>
+              Khi rau củ đến thời điểm chín rộ, bạn có thể tự đến vườn trải nghiệm hái rau hoặc nhờ nhân viên thu hoạch gửi về tận nhà.
+            </Text>
+
+            <View style={styles.harvestButtonsRow}>
+              <TouchableOpacity
+                style={styles.harvestSelfBtn}
+                onPress={() => handleHarvestDecision('SELF')}
+                disabled={harvestSubmitting}
+              >
+                <Text style={styles.harvestSelfBtnText}>🌿 Tôi tự đến thu hoạch</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.harvestStaffBtn}
+                onPress={() => handleHarvestDecision('STAFF')}
+                disabled={harvestSubmitting}
+              >
+                <Text style={styles.harvestStaffBtnText}>👨‍🌾 Nhờ vườn thu hoạch</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* ── Info Card ─────────────────────────────────── */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Thông tin hợp đồng</Text>
@@ -383,13 +470,43 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             </View>
           </View>
 
-          <View style={styles.infoRow}>
-            <Leaf size={16} color={colors.green[600]} />
-            <View style={styles.infoTexts}>
-              <Text style={styles.infoLabel}>Cột vườn</Text>
-              <Text style={styles.infoValue}>{rental.pillarCode ?? '--'}</Text>
+          {rental.treeName && (
+            <View style={styles.infoRow}>
+              <Sprout size={16} color={colors.green[600]} />
+              <View style={styles.infoTexts}>
+                <Text style={styles.infoLabel}>Giống rau canh tác</Text>
+                <Text style={[styles.infoValue, { color: colors.green[700], fontWeight: '700' }]}>
+                  {rental.treeName}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
+
+          {rental.pillars && rental.pillars.length > 0 ? (
+            <View style={styles.infoRow}>
+              <Leaf size={16} color={colors.green[600]} />
+              <View style={styles.infoTexts}>
+                <Text style={styles.infoLabel}>Các trụ canh tác</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {rental.pillars.map((p, idx) => (
+                    <View key={idx} style={styles.pillarBadgeFull}>
+                      <Text style={styles.pillarBadgeFullText}>
+                        Trụ {p.pillarCode} ({p.capacityHoles || 24} hốc)
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.infoRow}>
+              <Leaf size={16} color={colors.green[600]} />
+              <View style={styles.infoTexts}>
+                <Text style={styles.infoLabel}>Cột vườn</Text>
+                <Text style={styles.infoValue}>{rental.pillarCode ?? '--'}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Date Range */}
           <View style={styles.dateRangeCard}>
@@ -410,6 +527,16 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             <Text style={styles.totalLabel}>Tổng tiền hợp đồng</Text>
             <Text style={styles.totalValue}>{formatCurrency(rental.totalPrice)}</Text>
           </View>
+
+          {/* Cancel button if pending */}
+          {isPending && (
+            <TouchableOpacity
+              style={styles.cancelFullBtn}
+              onPress={handleCancelBooking}
+            >
+              <Text style={styles.cancelFullBtnText}>Hủy đơn đặt vườn này</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Transaction History ──────────────────────── */}
@@ -796,6 +923,82 @@ const styles = StyleSheet.create({
   serviceOptionDescSelected: { color: colors.green[600] },
   serviceOptionPrice: { ...typography.label, color: colors.green[700] },
   serviceOptionPriceSelected: { fontWeight: '700' },
+
+  // Harvest Card
+  harvestCard: {
+    backgroundColor: '#f0fdf4',
+    borderColor: colors.green[300],
+    borderWidth: 1.5,
+  },
+  harvestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  harvestSubtitle: {
+    ...typography.bodySmall,
+    color: colors.gray[600],
+    marginBottom: spacing.md,
+  },
+  harvestButtonsRow: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  harvestSelfBtn: {
+    backgroundColor: colors.green[600],
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  harvestSelfBtnText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  harvestStaffBtn: {
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.green[600],
+  },
+  harvestStaffBtnText: {
+    color: colors.green[700],
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+
+  pillarBadgeFull: {
+    backgroundColor: colors.green[50],
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.green[200],
+  },
+  pillarBadgeFullText: {
+    fontSize: 11,
+    color: colors.green[800],
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  cancelFullBtn: {
+    marginTop: spacing.md,
+    paddingVertical: 12,
+    backgroundColor: '#fee2e2',
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelFullBtnText: {
+    fontSize: 13,
+    color: '#dc2626',
+    fontFamily: 'Inter_600SemiBold',
+  },
 });
 
 // ─── Duration Picker Styles ───────────────────────────────────────────────────
