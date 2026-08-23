@@ -30,6 +30,14 @@ export const taskApi = {
   getMyTasks: (): Promise<GardeningTaskResponseDTO[]> =>
     apiClient.get('/tasks/my-tasks').then(r => r.data),
 
+  getAvailableTasks: (): Promise<GardeningTaskResponseDTO[]> =>
+    apiClient.get('/tasks/available').then(r => r.data),
+
+  claimTask: (taskId: number) => apiClient.post(`/tasks/${taskId}/claim`).then(r => r.data),
+  notifyHarvest: (taskId: number) => apiClient.post(`/tasks/${taskId}/notify-harvest`).then(r => r.data),
+  getEligibleHarvestRentals: () => apiClient.get('/tasks/harvest/eligible-rentals').then(r => r.data),
+  reportEarlyHarvest: (data: unknown) => apiClient.post('/tasks/harvest/early', data).then(r => r.data),
+
   updateTaskStatus: (taskId: number, dataOrStatus: TaskStatusUpdateDTO | string, evidenceImageUrl?: string): Promise<GardeningTaskResponseDTO> => {
     const payload: TaskStatusUpdateDTO = typeof dataOrStatus === 'string'
       ? { status: dataOrStatus, evidenceImageUrl }

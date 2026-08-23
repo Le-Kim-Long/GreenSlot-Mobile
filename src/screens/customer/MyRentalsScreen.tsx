@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,9 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  AppState,
-  type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
+import { useFocusEffect } from '@react-navigation/native';
 import { Leaf, Clock, CreditCard, ChevronRight } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import type { BookingHistory } from '../../types/api';
@@ -23,6 +21,7 @@ import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerTabProps } from '../../navigation/types';
+import { openAndWaitForPayment } from '../../utils/paymentFlow';
 
 type TabKey = 'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'COMPLETED';
 
@@ -32,10 +31,6 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [repayingId, setRepayingId] = useState<number | null>(null);
-
-  // Lưu rentalId đang chờ thanh toán để kiểm tra khi user quay về app
-  const pendingRepayRef = useRef<{ rentalId: number; prevStatus: string } | null>(null);
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const load = useCallback(async () => {
     try {
@@ -50,46 +45,11 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     load().finally(() => setLoading(false));
   }, [load]);
 
-  // Khi user quay lại app từ browser VNPay → kiểm tra kết quả thanh toán
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
-      const wasBackground =
-        appStateRef.current === 'background' || appStateRef.current === 'inactive';
-      const nowActive = nextState === 'active';
-
-      if (wasBackground && nowActive && pendingRepayRef.current) {
-        const { rentalId, prevStatus } = pendingRepayRef.current;
-        pendingRepayRef.current = null;
-
-        // Reload danh sách để lấy trạng thái mới nhất
-        try {
-          const updated = await bookingApi.getHistory();
-          setRentals(updated);
-          const rental = updated.find(r => r.id === rentalId);
-          const newStatus = rental?.status ?? '';
-          let payStatus: 'success' | 'failed' | 'pending';
-          if (newStatus === 'ACTIVE') {
-            payStatus = 'success';
-          } else if (prevStatus === newStatus) {
-            payStatus = 'pending';
-          } else {
-            payStatus = 'failed';
-          }
-          navigation.navigate('PaymentResult', {
-            status: payStatus,
-            rentalId: rentalId,
-            slotNumber: rental?.slotNumber,
-            txnRef: rental?.transactions?.[0]?.vnpTxnRef,
-          });
-        } catch {
-          // Không làm gì nếu lỗi mạng
-        }
-      }
-      appStateRef.current = nextState;
-    });
-
-    return () => subscription.remove();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -108,6 +68,30 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
       : tab === 'PENDING_PAYMENT'
       ? rentals.filter(r => r.status === 'PENDING_PAYMENT' || r.status === 'PENDING')
       : rentals.filter(r => r.status === tab);
+
+  // Hủy đơn thuê đang chờ thanh toán
+  const handleCancel = (rental: BookingHistory) => {
+    Alert.alert(
+      'Hủy đơn đặt vườn',
+      `Bạn có chắc chắn muốn hủy đơn thuê ô ${rental.slotNumber} này không?`,
+      [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy đơn',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await bookingApi.cancelBooking(rental.id);
+              Alert.alert('Thành công', 'Đã hủy đơn đặt vườn thành công.');
+              load();
+            } catch (err: any) {
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy đơn. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Tiếp tục thanh toán
   const handleRepay = async (rental: BookingHistory) => {
@@ -129,9 +113,20 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     try {
       const result = await bookingApi.repayBooking(rental.id);
       if (result.paymentUrl) {
-        // Lưu thông tin rental đang chờ thanh toán để kiểm tra khi quay về
-        pendingRepayRef.current = { rentalId: rental.id, prevStatus: rental.status };
-        await Linking.openURL(result.paymentUrl);
+        const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
+        const callback = 'callback' in settled ? settled.callback : undefined;
+        if (settled.status === 'success' && settled.rental) {
+          navigation.replace('RentalDetail', { rental: settled.rental });
+        } else {
+          navigation.navigate('PaymentResult', {
+            status: settled.status,
+            rentalId: rental.id,
+            slotNumber: rental.slotNumber,
+            amount: callback?.amount,
+            txnRef: callback?.txnRef,
+            orderInfo: callback?.orderInfo,
+          });
+        }
       } else {
         Alert.alert('Thông báo', 'Không tìm thấy link thanh toán. Vui lòng thử lại sau.');
       }
@@ -227,6 +222,21 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle}>{item.slotNumber}</Text>
                   <Text style={styles.cardSub}>{item.locationName}</Text>
+                  
+                  {item.treeName && (
+                    <Text style={styles.cardTree}>🌱 {item.treeName}</Text>
+                  )}
+
+                  {item.pillars && item.pillars.length > 0 && (
+                    <View style={styles.pillarsRow}>
+                      {item.pillars.map((p, idx) => (
+                        <View key={idx} style={styles.pillarBadge}>
+                          <Text style={styles.pillarBadgeText}>{p.pillarCode}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
                   {/* Full date range */}
                   <View style={styles.dateRow}>
                     <Text style={styles.cardDate}>📅 {item.startDate}</Text>
@@ -239,23 +249,33 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
 
               <Text style={styles.cardPrice}>{formatCurrency(item.totalPrice)}</Text>
 
-              {/* Tiếp tục thanh toán */}
+              {/* Action Buttons for Pending */}
               {isPendingPayment && (
-                <TouchableOpacity
-                  style={[styles.repayBtn, isRepaying && styles.repayBtnDisabled]}
-                  onPress={(e) => { e.stopPropagation?.(); !isRepaying && handleRepay(item); }}
-                  activeOpacity={0.8}
-                  disabled={isRepaying}
-                >
-                  {isRepaying ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <CreditCard size={16} color={colors.white} />
-                  )}
-                  <Text style={styles.repayBtnText}>
-                    {isRepaying ? 'Đang xử lý...' : 'Tiếp tục thanh toán'}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.actionButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.repayBtn, isRepaying && styles.repayBtnDisabled]}
+                    onPress={(e) => { e.stopPropagation?.(); !isRepaying && handleRepay(item); }}
+                    activeOpacity={0.8}
+                    disabled={isRepaying}
+                  >
+                    {isRepaying ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <CreditCard size={15} color={colors.white} />
+                    )}
+                    <Text style={styles.repayBtnText}>
+                      {isRepaying ? 'Đang xử lý...' : 'Thanh toán ngay'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={(e) => { e.stopPropagation?.(); handleCancel(item); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.cancelBtnText}>Hủy đơn</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {/* Gia hạn hint */}
@@ -389,22 +409,70 @@ const styles = StyleSheet.create({
 
   cardPrice: { ...typography.label, color: colors.green[600], marginBottom: spacing.sm },
 
+  cardTree: {
+    ...typography.caption,
+    color: colors.green[700],
+    fontFamily: 'Inter_600SemiBold',
+    marginTop: 2,
+  },
+  pillarsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  pillarBadge: {
+    backgroundColor: colors.green[50],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.green[200],
+  },
+  pillarBadgeText: {
+    fontSize: 10,
+    color: colors.green[800],
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+
   // Repay button
   repayBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     backgroundColor: ORANGE,
     borderRadius: radius.md,
-    paddingVertical: 12,
-    marginTop: spacing.xs,
+    paddingVertical: 10,
   },
   repayBtnDisabled: { opacity: 0.6 },
   repayBtnText: {
     ...typography.label,
+    fontSize: 12,
     color: colors.white,
     fontWeight: '700',
+  },
+
+  cancelBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontFamily: 'Inter_600SemiBold',
   },
 
   extendHint: {

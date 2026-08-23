@@ -1,4 +1,14 @@
-export type UserRole = 'customer' | 'garden_staff' | 'location_manager' | 'manager' | 'admin' | 'ROLE_CUSTOMER' | 'ROLE_GARDEN_STAFF' | 'ROLE_LOCATION_MANAGER' | 'ROLE_MANAGER' | 'ROLE_ADMIN';
+export type UserRole =
+  | 'customer'
+  | 'garden_staff'
+  | 'location_manager'
+  | 'manager'
+  | 'admin'
+  | 'ROLE_CUSTOMER'
+  | 'ROLE_GARDEN_STAFF'
+  | 'ROLE_LOCATION_MANAGER'
+  | 'ROLE_MANAGER'
+  | 'ROLE_ADMIN';
 
 export interface User {
   id: string | number;
@@ -21,6 +31,9 @@ export interface ProfileResponseDTO {
   fullName: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
+  locationId?: number;
+  locationName?: string;
   roles: string[];
 }
 
@@ -28,6 +41,7 @@ export interface UserProfileUpdateDTO {
   fullName?: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
 }
 
 export interface MessageResponseDTO {
@@ -44,21 +58,65 @@ export interface JwtResponse {
   roles: string[];
 }
 
+export interface PillarDetail {
+  id: number;
+  pillarCode: string;
+  status: string;
+  pillarType?: string;
+  pillarTypeName?: string;
+  capacityHoles?: number;
+  price?: number;
+  requiredArea?: number;
+  defaultTreeId?: number;
+  defaultTreeName?: string;
+  defaultTreePrice?: number;
+  defaultTreeImageUrl?: string;
+  cameraStreamUrl?: string;
+  cameraStatus?: string;
+  locationId?: number;
+  locationName?: string;
+  slotId?: number;
+  slotNumber?: string;
+  isRented?: boolean;
+  isAvailable?: boolean;
+}
+
+export type PillarInfo = PillarDetail;
+
 export interface AvailableSlotResponseDTO {
   id: number;
   slotNumber: string;
   price: number;
+  area?: number;
+  maxPillars?: number;
   status: string;
   pillarCode: string;
+  pillarCodes?: string[];
+  pillarCount?: number;
   locationName: string;
+  locationId?: number;
+  locationAddress?: string;
   imageUrl?: string;
+  pillars?: PillarDetail[];
+  totalHoles?: number;
+  calculatedPillarsPrice?: number;
+  calculatedTreesPrice?: number;
 }
+
+export type PillarDetailDTO = PillarDetail;
 
 export interface BookingRequestDTO {
   slotId: number;
   durationInMonths: number;
   startTime: string;
+  treeId?: number;
+  treeIds?: number[];
+  pillarIds?: number[];
+  smallPillarsCount?: number;
+  mediumPillarsCount?: number;
+  largePillarsCount?: number;
   isMobile?: boolean;
+  mobileRedirectUrl?: string;
 }
 
 export interface BookingResponseDTO {
@@ -71,6 +129,7 @@ export interface ExtensionRequestDTO {
   rentalId: number;
   durationInMonths: number;
   isMobile?: boolean;
+  mobileRedirectUrl?: string;
 }
 
 export interface PaymentTransactionInfo {
@@ -83,14 +142,43 @@ export interface PaymentTransactionInfo {
 
 export interface RentalHistoryDTO {
   rentalId: number;
+  slotId?: number;
   slotNumber: string;
   pillarCode?: string;
+  pillarCodes?: string[];
+  pillars?: PillarDetail[];
   locationName?: string;
   locationAddress?: string;
   startTime: string;
   endTime: string;
   rentalStatus: string;
+  treeId?: number;
+  treeName?: string;
+  cropStatus?: string;
+  monthlyPrice?: number;
   transactions: PaymentTransactionInfo[];
+  harvestNotifiedAt?: string;
+  harvestDecision?: string;
+  plantedAt?: string;
+  expectedHarvestAt?: string;
+}
+
+export interface HarvestHistoryItem {
+  id: number;
+  rentalId: number;
+  locationId?: number;
+  locationName?: string;
+  slotId?: number;
+  slotNumber?: string;
+  treeId?: number;
+  treeName?: string;
+  customerId?: number;
+  customerName?: string;
+  harvestMethod: 'SELF' | 'STAFF';
+  staffId?: number;
+  staffName?: string;
+  plantedAt?: string;
+  harvestedAt: string;
 }
 
 export interface ServiceRequestDTO {
@@ -260,6 +348,7 @@ export interface TreeDTO {
 export interface TreePlantingRequestCreateDTO {
   rentalId: number;
   newTreeId: number;
+  targetPillarId?: number;
   reason: string;
   notes?: string;
 }
@@ -267,18 +356,22 @@ export interface TreePlantingRequestCreateDTO {
 export interface TreePlantingRequestDTO {
   id: number;
   rentalId: number;
-  slotId?: number;            // alias used in older mapping
+  slotId?: number; // alias used in older mapping
   slotNumber: string;
+  targetPillarId?: number;
+  targetPillarCode?: string;
   newTreeId: number;
   newTreeName: string;
-  treeName?: string;          // alias for newTreeName (mobile display)
+  treeName?: string; // alias for newTreeName (mobile display)
   requestedById: number;
   requestedByName: string;
-  userName?: string;          // alias for requestedByName (mobile display)
+  userName?: string; // alias for requestedByName (mobile display)
   status: string;
   reason: string;
   notes?: string;
-  rejectReason?: string;      // populated by backend when status=REJECTED
+  price?: number;
+  paymentUrl?: string;
+  rejectReason?: string; // populated by backend when status=REJECTED
   requestedAt: string;
   processedAt?: string;
   processedById?: number;
@@ -447,6 +540,8 @@ export interface BookingHistory {
   slotId?: number;
   slotNumber: string;
   pillarCode?: string;
+  pillarCodes?: string[];
+  pillars?: PillarDetail[];
   locationName?: string;
   locationAddress?: string;
   startDate: string;
@@ -454,9 +549,15 @@ export interface BookingHistory {
   startTime?: string;
   endTime?: string;
   totalPrice: number;
+  monthlyPrice?: number;
   status: string;
   paymentStatus?: string;
+  treeId?: number;
+  treeName?: string;
+  cropStatus?: string;
   transactions: PaymentTransactionInfo[];
+  harvestNotifiedAt?: string;
+  harvestDecision?: string;
 }
 
 export type ServiceType = ServiceTypeDTO;
@@ -467,5 +568,3 @@ export type ServiceRequest = ServiceRequestDTO;
 export type BookingRequest = BookingRequestDTO;
 export type BookingResponse = BookingResponseDTO;
 export type ExtensionRequest = ExtensionRequestDTO;
-
-
