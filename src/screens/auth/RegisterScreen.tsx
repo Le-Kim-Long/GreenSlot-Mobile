@@ -24,6 +24,7 @@ import {
   ArrowRight,
   UserPlus,
   Sparkles,
+  MapPin,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/Input';
@@ -31,6 +32,7 @@ import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { AuthScreenProps } from '../../navigation/types';
+import { getApiErrorMessage } from '../../api/client';
 
 export default function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
   const { register } = useAuth();
@@ -40,6 +42,7 @@ export default function RegisterScreen({ navigation }: AuthScreenProps<'Register
     name: '',
     email: '',
     phone: '',
+    address: '',
     password: '',
     confirm: '',
   });
@@ -182,22 +185,23 @@ export default function RegisterScreen({ navigation }: AuthScreenProps<'Register
         form.name.trim(),
         form.email.trim(),
         form.password,
-        form.phone.trim()
+        form.phone.trim(),
+        form.address.trim()
       );
       setLoading(false);
 
       if (result === true) {
         Alert.alert(
           'Đăng ký thành công! 🎉',
-          'Tài khoản của bạn đã được khởi tạo. Vui lòng đăng nhập.',
-          [{ text: 'Đăng nhập ngay', onPress: () => navigation.navigate('Login') }]
+          'Một mã xác thực OTP đã được gửi đến email của bạn. Vui lòng kiểm tra và xác thực.',
+          [{ text: 'Xác thực ngay', onPress: () => navigation.navigate('VerifyOtp', { email: form.email.trim() }) }]
         );
       } else {
         setApiError(typeof result === 'string' ? result : 'Đăng ký thất bại.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLoading(false);
-      setApiError(err?.message || 'Có lỗi xảy ra trong quá trình đăng ký.');
+      setApiError(getApiErrorMessage(err, 'Có lỗi xảy ra trong quá trình đăng ký.'));
     }
   };
 
@@ -303,6 +307,17 @@ export default function RegisterScreen({ navigation }: AuthScreenProps<'Register
                 placeholder="Nhập số điện thoại (tùy chọn)"
                 leftIcon={<Phone size={17} color={colors.green[600]} />}
                 error={touched.phone ? errors.phone : undefined}
+                containerStyle={styles.inputWrapper}
+                style={styles.inputField}
+              />
+
+              {/* 4b. Address */}
+              <Input
+                label="Địa chỉ"
+                value={form.address}
+                onChangeText={v => update('address', v)}
+                placeholder="Nhập địa chỉ (tùy chọn)"
+                leftIcon={<MapPin size={17} color={colors.green[600]} />}
                 containerStyle={styles.inputWrapper}
                 style={styles.inputField}
               />

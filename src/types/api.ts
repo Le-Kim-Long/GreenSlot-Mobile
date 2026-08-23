@@ -1,4 +1,14 @@
-export type UserRole = 'customer' | 'garden_staff' | 'location_manager' | 'manager' | 'admin' | 'ROLE_CUSTOMER' | 'ROLE_GARDEN_STAFF' | 'ROLE_LOCATION_MANAGER' | 'ROLE_MANAGER' | 'ROLE_ADMIN';
+export type UserRole =
+  | 'customer'
+  | 'garden_staff'
+  | 'location_manager'
+  | 'manager'
+  | 'admin'
+  | 'ROLE_CUSTOMER'
+  | 'ROLE_GARDEN_STAFF'
+  | 'ROLE_LOCATION_MANAGER'
+  | 'ROLE_MANAGER'
+  | 'ROLE_ADMIN';
 
 export interface User {
   id: string | number;
@@ -21,6 +31,9 @@ export interface ProfileResponseDTO {
   fullName: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
+  locationId?: number;
+  locationName?: string;
   roles: string[];
 }
 
@@ -28,6 +41,7 @@ export interface UserProfileUpdateDTO {
   fullName?: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
 }
 
 export interface MessageResponseDTO {
@@ -89,6 +103,8 @@ export interface AvailableSlotResponseDTO {
   calculatedTreesPrice?: number;
 }
 
+export type PillarDetailDTO = PillarDetail;
+
 export interface BookingRequestDTO {
   slotId: number;
   durationInMonths: number;
@@ -139,7 +155,12 @@ export interface RentalHistoryDTO {
   treeId?: number;
   treeName?: string;
   cropStatus?: string;
+  monthlyPrice?: number;
   transactions: PaymentTransactionInfo[];
+  harvestNotifiedAt?: string;
+  harvestDecision?: string;
+  plantedAt?: string;
+  expectedHarvestAt?: string;
 }
 
 export interface HarvestHistoryItem {
@@ -335,22 +356,22 @@ export interface TreePlantingRequestCreateDTO {
 export interface TreePlantingRequestDTO {
   id: number;
   rentalId: number;
-  slotId?: number;            // alias used in older mapping
+  slotId?: number; // alias used in older mapping
   slotNumber: string;
   targetPillarId?: number;
   targetPillarCode?: string;
   newTreeId: number;
   newTreeName: string;
-  treeName?: string;          // alias for newTreeName (mobile display)
+  treeName?: string; // alias for newTreeName (mobile display)
   requestedById: number;
   requestedByName: string;
-  userName?: string;          // alias for requestedByName (mobile display)
+  userName?: string; // alias for requestedByName (mobile display)
   status: string;
   reason: string;
   notes?: string;
   price?: number;
   paymentUrl?: string;
-  rejectReason?: string;      // populated by backend when status=REJECTED
+  rejectReason?: string; // populated by backend when status=REJECTED
   requestedAt: string;
   processedAt?: string;
   processedById?: number;
@@ -528,12 +549,15 @@ export interface BookingHistory {
   startTime?: string;
   endTime?: string;
   totalPrice: number;
+  monthlyPrice?: number;
   status: string;
   paymentStatus?: string;
   treeId?: number;
   treeName?: string;
   cropStatus?: string;
   transactions: PaymentTransactionInfo[];
+  harvestNotifiedAt?: string;
+  harvestDecision?: string;
 }
 
 export type ServiceType = ServiceTypeDTO;
@@ -544,5 +568,3 @@ export type ServiceRequest = ServiceRequestDTO;
 export type BookingRequest = BookingRequestDTO;
 export type BookingResponse = BookingResponseDTO;
 export type ExtensionRequest = ExtensionRequestDTO;
-
-

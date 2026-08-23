@@ -15,4 +15,10 @@ export * from './treeApi';
 export * from './userApi';
 export * from './cameraApi';
 export * from './customerAnalyticsApi';
-
+export * from './pumpApi';
+export * from './harvestApi';
+export * from './feedbackApi';
+export * from './preferenceApi';
+export * from './imageApi';
+export * from './reportApi';
+export * from './locationApi';

@@ -12,6 +12,7 @@ import {
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Linking from 'expo-linking';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { LoadingScreen } from './src/components/ui/LoadingScreen';
@@ -19,7 +20,6 @@ import { setupNotificationListeners } from './src/utils/notificationHelper';
 import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync();
-
 export default function App() {
   const [fontsLoaded] = useFonts({
     Inter_300Light,
@@ -56,10 +56,24 @@ export default function App() {
     return <LoadingScreen />;
   }
 
+  const linking = {
+    prefixes: [Linking.createURL('/'), 'greenslot://'],
+    config: {
+      screens: {
+        Customer: {
+          screens: {
+            CustomerTabs: '',
+            PaymentResult: 'payment-result',
+          },
+        },
+      },
+    },
+  };
+
   return (
     <SafeAreaProvider onLayout={onLayoutRootView}>
       <AuthProvider>
-        <NavigationContainer>
+        <NavigationContainer linking={linking as any}>
           <StatusBar style="dark" />
           <RootNavigator />
         </NavigationContainer>

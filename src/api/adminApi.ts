@@ -36,4 +36,7 @@ export const adminApi = {
 
   getAllGlobalContent: (): Promise<GlobalContentDTO[]> =>
     apiClient.get('/admin/global-content').then(r => r.data),
+
+  createUser: (data: unknown) => apiClient.post('/admin/users', data).then(r => r.data),
+  assignUserLocation: (userId: number, locationId: number) => apiClient.put(`/admin/users/${userId}/location/${locationId}`).then(r => r.data),
 };

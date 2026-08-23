@@ -24,12 +24,15 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     startTime: dto.startTime,
     endTime: dto.endTime,
     totalPrice,
+    monthlyPrice: dto.monthlyPrice,
     status: dto.rentalStatus,
     paymentStatus: paidTx?.status || latestTx?.status,
     treeId: dto.treeId,
     treeName: dto.treeName,
     cropStatus: dto.cropStatus,
     transactions: dto.transactions ?? [],
+    harvestNotifiedAt: dto.harvestNotifiedAt,
+    harvestDecision: dto.harvestDecision,
   };
 }
 

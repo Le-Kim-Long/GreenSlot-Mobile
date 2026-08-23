@@ -22,6 +22,7 @@ import { Card } from '../../components/ui/Card';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerStackProps } from '../../navigation/types';
+import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
 
 const MONTH_NAMES = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4',
@@ -33,6 +34,11 @@ const SHORT_MONTHS = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','
 const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12, 18, 24];
+const PILLAR_DEFAULTS = {
+  LARGE: { holes: 48, area: 2, price: 300000 },
+  MEDIUM: { holes: 36, area: 1.5, price: 200000 },
+  SMALL: { holes: 24, area: 1, price: 150000 },
+} as const;
 
 function formatDate(date: Date): string {
   const d = date.getDate().toString().padStart(2, '0');
@@ -167,7 +173,6 @@ function CalendarPicker({ selectedDate, minDate, onSelect }: CalendarPickerProps
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────────────
 export default function GardenDetailScreen({ route, navigation }: CustomerStackProps<'GardenDetail'>) {
   const { slot } = route.params;
   const [selectedMonths, setSelectedMonths] = useState(3);
@@ -175,12 +180,10 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
   const [pickerVisible, setPickerVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
 
-  // Trees and Pillars state
   const [trees, setTrees] = useState<TreeDTO[]>([]);
   const [selectedTreeForModalPillarId, setSelectedTreeForModalPillarId] = useState<number | null>(null);
   const [treeModalVisible, setTreeModalVisible] = useState(false);
 
-  // Resolve available pillars for this slot
   const availablePillars: PillarInfo[] = useMemo(() => {
     if (slot.pillars && slot.pillars.length > 0) {
       return slot.pillars;
@@ -201,25 +204,20 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
     }];
   }, [slot]);
 
-  // Selected pillar IDs (default all available pillars)
   const [selectedPillarIds, setSelectedPillarIds] = useState<number[]>(() =>
     availablePillars.map(p => p.id)
   );
 
-  // Mapping pillarId -> treeId
   const [pillarTreeSelections, setPillarTreeSelections] = useState<{ [pillarId: number]: number }>({});
 
-  // AppState ref để phát hiện khi user quay về app sau khi thanh toán
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const pendingPaymentRef = useRef<boolean>(false);
 
-  // Load active trees on mount
   useEffect(() => {
     treeApi.getActiveTrees()
       .then(data => {
         setTrees(data);
         if (data.length > 0 && data[0].id != null) {
-          // Set default tree for all pillars
           const firstTreeId = data[0].id;
           const defaultMap: { [pillarId: number]: number } = {};
           availablePillars.forEach(p => {
@@ -240,7 +238,6 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
   const [startDate, setStartDate] = useState<Date>(today);
   const endDate = useMemo(() => addMonths(startDate, selectedMonths), [startDate, selectedMonths]);
 
-  // Toggle single pillar selection
   const togglePillar = (pillarId: number) => {
     setSelectedPillarIds(prev => {
       if (prev.includes(pillarId)) {
@@ -255,7 +252,6 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
     });
   };
 
-  // Pricing calculations
   const slotRentalCost = slot.price * selectedMonths;
   
   const totalTreeCost = useMemo(() => {
@@ -276,45 +272,6 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
 
   const isStartToday = isSameDay(startDate, today);
 
-  // Khi user quay lại app từ browser VNPay → kiểm tra kết quả đặt thuê
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
-      const wasBackground =
-        appStateRef.current === 'background' || appStateRef.current === 'inactive';
-      const nowActive = nextState === 'active';
-
-      if (wasBackground && nowActive && pendingPaymentRef.current) {
-        pendingPaymentRef.current = false;
-
-        try {
-          const history = await bookingApi.getHistory();
-          // Tìm rental mới nhất của slot này
-          const newRental = history.find(r => r.slotId === slot.id || r.slotNumber === slot.slotNumber);
-
-          let payStatus: 'success' | 'failed' | 'pending';
-          if (newRental?.status === 'ACTIVE') {
-            payStatus = 'success';
-          } else if (newRental?.status === 'PENDING_PAYMENT' || newRental?.status === 'PENDING') {
-            payStatus = 'pending';
-          } else {
-            payStatus = 'failed';
-          }
-          navigation.navigate('PaymentResult', {
-            status: payStatus,
-            slotNumber: slot.slotNumber,
-            rentalId: newRental?.id,
-          });
-        } catch {
-          // Không làm gì nếu lỗi mạng
-        }
-      }
-
-      appStateRef.current = nextState;
-    });
-
-    return () => subscription.remove();
-  }, [slot.id, slot.slotNumber, navigation]);
-
   const handleBook = async () => {
     if (selectedPillarIds.length === 0) {
       Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 trụ canh tác.');
@@ -334,7 +291,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
         treeIds: selectedTreesList,
         pillarIds: selectedPillarIds,
         isMobile: true,
-        mobileRedirectUrl: 'greenslot://payment-result',
+        mobileRedirectUrl: getMobileRedirectUrl(),
       });
 
       if (result.paymentUrl) {
@@ -346,8 +303,13 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
             {
               text: 'Thanh toán ngay',
               onPress: async () => {
-                pendingPaymentRef.current = true;
-                await Linking.openURL(result.paymentUrl);
+                const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, result.rentalId);
+                const callback = 'callback' in settled ? settled.callback : undefined;
+                if (settled.status === 'success' && settled.rental) {
+                  navigation.replace('RentalDetail', { rental: settled.rental });
+                } else {
+                  navigation.navigate('PaymentResult', { status: settled.status, rentalId: result.rentalId, slotNumber: slot.slotNumber, amount: callback?.amount, txnRef: callback?.txnRef, orderInfo: callback?.orderInfo });
+                }
               },
             },
           ]
