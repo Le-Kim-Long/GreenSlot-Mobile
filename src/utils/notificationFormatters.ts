@@ -1,21 +1,15 @@
 import {
-  Bell,
-  CheckCircle2,
-  XCircle,
   AlertTriangle,
-  Info,
-  Sprout,
-  Leaf,
-  Wifi,
-  Wrench,
-  CreditCard,
-  Clock,
   Calendar,
-  ShieldAlert,
-  Droplets,
-  Sun,
-  Flame,
   CheckCheck,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Info,
+  Leaf,
+  Sprout,
+  Wrench,
+  XCircle
 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import type { NotificationResponseDTO } from '../types/api';

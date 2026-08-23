@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { authApi } from '../api/authApi';
-import { setStoredToken, clearStoredToken, setUnauthorizedHandler } from '../api/client';
+import { setStoredToken, clearStoredToken, setUnauthorizedHandler, getApiErrorMessage } from '../api/client';
 import type { User, UserRole } from '../types/api';
 import { mapBackendRolesToFrontend } from '../utils/roleMap';
 import { registerForPushNotificationsAsync } from '../utils/notificationHelper';
@@ -11,9 +11,10 @@ const USER_KEY = 'greenslot_user';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<string | true>;
   logout: () => Promise<void>;
-  register: (username: string, name: string, email: string, password: string, phone?: string) => Promise<string | true>;
+  register: (username: string, name: string, email: string, password: string, phone?: string, address?: string) => Promise<string | true>;
+  loginWithJwtData: (data: import('../types/api').JwtResponse) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<string | true> => {
     try {
       const data = await authApi.login({ username, password });
       if (data?.token) {
@@ -74,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(loggedUser);
         return true;
       }
-      return false;
-    } catch {
-      return false;
+      return 'Không nhận được mã xác thực từ máy chủ';
+    } catch (error: unknown) {
+      return getApiErrorMessage(error, 'Tên đăng nhập hoặc mật khẩu không chính xác');
     }
   };
 
@@ -85,7 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string,
     email: string,
     password: string,
-    phone?: string
+    phone?: string,
+    address?: string
   ): Promise<string | true> => {
     try {
       await authApi.register({
@@ -94,17 +96,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         fullName: name,
         phone: phone || undefined,
+        address: address || undefined,
       });
       return true;
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } | string } };
-      const msg = err?.response?.data;
-      if (typeof msg === 'string') return msg;
-      if (msg && typeof msg === 'object' && 'message' in msg && typeof msg.message === 'string') {
-        return msg.message;
-      }
-      return 'Đăng ký thất bại. Vui lòng thử lại.';
+      return getApiErrorMessage(error, 'Đăng ký thất bại. Vui lòng thử lại.');
     }
+  };
+
+  const loginWithJwtData = async (data: import('../types/api').JwtResponse): Promise<void> => {
+    await setStoredToken(data.token);
+    const role = mapBackendRolesToFrontend(data.roles) as UserRole;
+    const loggedUser: User = {
+      id: data.id?.toString(),
+      name: data.fullName || data.username,
+      email: data.email,
+      role,
+      createdAt: new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(loggedUser));
+    setUser(loggedUser);
   };
 
   return (
@@ -115,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         register,
+        loginWithJwtData,
         isAuthenticated: !!user,
       }}
     >

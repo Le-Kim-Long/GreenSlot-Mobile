@@ -177,4 +177,8 @@ export const businessManagerApi = {
 
   getGardenStaffsByLocation: (locationId: number): Promise<UserAdminDTO[]> =>
     apiClient.get('/manager/staffs', { params: { locationId } }).then(r => r.data),
+
+  getDashboardMetrics: (locationId: number) => apiClient.get(`/dashboard/metrics/${locationId}`).then(r => r.data),
+  exportReport: (kind: 'rentals' | 'alerts' | 'tasks', format: 'csv' | 'excel', params?: Record<string, string>) =>
+    apiClient.get(`/reports/${kind}/${format}`, { params, responseType: 'blob' }).then(r => r.data),
 };

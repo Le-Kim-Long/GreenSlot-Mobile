@@ -12,8 +12,11 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
 
   return {
     id: dto.rentalId,
+    slotId: dto.slotId,
     slotNumber: dto.slotNumber,
     pillarCode: dto.pillarCode,
+    pillarCodes: dto.pillarCodes,
+    pillars: dto.pillars,
     locationName: dto.locationName,
     locationAddress: dto.locationAddress,
     startDate: formatDate(dto.startTime),
@@ -21,9 +24,15 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     startTime: dto.startTime,
     endTime: dto.endTime,
     totalPrice,
+    monthlyPrice: dto.monthlyPrice,
     status: dto.rentalStatus,
     paymentStatus: paidTx?.status || latestTx?.status,
+    treeId: dto.treeId,
+    treeName: dto.treeName,
+    cropStatus: dto.cropStatus,
     transactions: dto.transactions ?? [],
+    harvestNotifiedAt: dto.harvestNotifiedAt,
+    harvestDecision: dto.harvestDecision,
   };
 }
 

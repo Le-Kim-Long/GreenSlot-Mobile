@@ -63,7 +63,8 @@ const STATUS_CONFIG: Record<PaymentStatus, StatusConfig> = {
 
 function formatAmount(amountStr?: string): string | null {
   if (!amountStr) return null;
-  const num = parseInt(amountStr, 10);
+  // VNPay sends vnp_Amount in VND x 100.
+  const num = parseInt(amountStr, 10) / 100;
   if (isNaN(num)) return null;
   return num.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 }
@@ -72,9 +73,11 @@ export default function PaymentResultScreen({
   route,
   navigation,
 }: CustomerStackProps<'PaymentResult'>) {
-  const { status, slotNumber, amount, txnRef, orderInfo } = route.params;
+  const params = route.params ?? {};
+  const status = params.status ?? 'pending';
+  const { slotNumber, amount, txnRef, orderInfo } = params;
 
-  const config = STATUS_CONFIG[status];
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const Icon = config.icon;
 
   const [countdown, setCountdown] = useState(AUTO_NAVIGATE_DELAY / 1000);
