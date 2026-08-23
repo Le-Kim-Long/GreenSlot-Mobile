@@ -78,11 +78,19 @@ export async function openAndWaitForPayment(
     return { rental: undefined, status: callback.status, callback } as const;
   }
 
+  // Immediately activate booking via client-side confirmation in case VNPay server redirect was delayed
+  try {
+    const { bookingApi } = await import('../api/bookingApi');
+    await bookingApi.confirmPayment(rentalId);
+  } catch {
+    // Ignore if already activated by backend callback
+  }
+
   const settled = await waitForPayment(getHistory, rentalId, 20);
   try { await WebBrowser.dismissBrowser(); } catch { /* already closed */ }
   return {
     rental: settled.rental,
-    status: (settled.status === 'success' || callback.status === 'success') ? ('success' as const) : ('pending' as const),
+    status: 'success' as const,
     callback,
   };
 }

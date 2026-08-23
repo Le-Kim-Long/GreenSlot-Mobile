@@ -115,6 +115,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
       if (result.paymentUrl) {
         const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
         const callback = 'callback' in settled ? settled.callback : undefined;
+        await load();
         if (settled.status === 'success' && settled.rental) {
           navigation.replace('RentalDetail', { rental: settled.rental });
         } else {
