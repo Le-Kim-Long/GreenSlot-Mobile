@@ -80,5 +80,9 @@ export async function openAndWaitForPayment(
 
   const settled = await waitForPayment(getHistory, rentalId, 20);
   try { await WebBrowser.dismissBrowser(); } catch { /* already closed */ }
-  return { ...settled, callback } as const;
+  return {
+    rental: settled.rental,
+    status: (settled.status === 'success' || callback.status === 'success') ? ('success' as const) : ('pending' as const),
+    callback,
+  };
 }
