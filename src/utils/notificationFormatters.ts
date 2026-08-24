@@ -261,21 +261,31 @@ export function getNotificationActionRoute(notification: NotificationResponseDTO
     return { screen: 'IoTMonitoring' };
   }
 
-  if (t.startsWith('PLANTING_')) {
+  if (t.startsWith('PLANTING_') || t.startsWith('TREE_PLANTING')) {
     return { screen: 'CustomerTreePlanting' };
   }
 
-  if (t.startsWith('TASK_') || t.startsWith('HARVEST_')) {
-    return { screen: 'CareServices' };
+  if (t.includes('HARVEST') && (t.includes('COMPLETED') || t.includes('DONE'))) {
+    return { screen: 'CustomerHarvestHistory' };
   }
 
-  if (t === 'BOOKING_SUCCESS') {
-    return { screen: 'PaymentHistory' };
-  }
-
-  if (t.startsWith('RENTAL_')) {
+  if (t.startsWith('HARVEST_')) {
     return { screen: 'Rentals' };
   }
 
-  return null;
+
+  if (t.startsWith('TASK_')) {
+    return { screen: 'CareServices' };
+  }
+
+  if (t === 'BOOKING_SUCCESS' || t.startsWith('PAYMENT_')) {
+    return { screen: 'PaymentHistory' };
+  }
+
+  if (t.startsWith('RENTAL_') || t.startsWith('BOOKING_')) {
+    return { screen: 'Rentals' };
+  }
+
+  return { screen: 'Rentals' };
 }
+
