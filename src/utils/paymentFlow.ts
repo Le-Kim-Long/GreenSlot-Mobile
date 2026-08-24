@@ -70,27 +70,33 @@ export async function openAndWaitForPayment(
 ) {
   const callback = await openPaymentSession(paymentUrl);
 
-  if (!callback) {
-    return { rental: undefined, status: 'pending' as const };
-  }
-
-  if (callback.status !== 'success') {
-    return { rental: undefined, status: callback.status, callback } as const;
-  }
-
-  // Immediately activate booking via client-side confirmation in case VNPay server redirect was delayed
+  // Regardless of whether browser returned a custom scheme or user dismissed browser,
+  // attempt immediate confirmation with backend.
   try {
     const { bookingApi } = await import('../api/bookingApi');
     await bookingApi.confirmPayment(rentalId);
   } catch {
-    // Ignore if already activated by backend callback
+    // Ignore if already activated or in progress
   }
 
   const settled = await waitForPayment(getHistory, rentalId, 20);
   try { await WebBrowser.dismissBrowser(); } catch { /* already closed */ }
+
+  if (settled.status === 'success') {
+    return {
+      rental: settled.rental,
+      status: 'success' as const,
+      callback: callback || { status: 'success' },
+    };
+  }
+
+  if (callback && callback.status !== 'success') {
+    return { rental: undefined, status: callback.status, callback } as const;
+  }
+
   return {
     rental: settled.rental,
-    status: 'success' as const,
+    status: settled.status,
     callback,
   };
 }
