@@ -11,7 +11,7 @@ export function resolveApiBaseUrl(): string {
 
 export const apiClient = axios.create({
   baseURL: resolveApiBaseUrl(),
-  timeout: 20000,
+  timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -22,7 +22,14 @@ export function getApiErrorMessage(error: unknown, fallback = 'Đã xảy ra l�
     if (typeof data === 'object' && data?.message) return data.message;
     if (typeof data === 'object' && data?.error) return data.error;
     if (error.code === 'ECONNABORTED') return 'Kết nối quá thời gian. Vui lòng thử lại.';
-    if (!error.response) return 'Không thể kết nối máy chủ. Kiểm tra mạng và thử lại.';
+    if (!error.response) {
+      console.log('Network Error Details:', {
+        message: error.message,
+        code: error.code,
+        config: error.config?.baseURL,
+      });
+      return 'Không thể kết nối máy chủ. Kiểm tra mạng và thử lại.';
+    }
   }
   return error instanceof Error && error.message ? error.message : fallback;
 }

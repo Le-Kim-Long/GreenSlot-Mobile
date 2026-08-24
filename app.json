@@ -24,7 +24,17 @@
         "monochromeImage": "./assets/android-icon-monochrome.png",
         "backgroundColor": "#16a34a"
       },
-      "package": "com.greenslot.mobile"
+      "package": "com.greenslot.mobile",
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "networkSecurityConfig": {
+        "domainSettings": [
+          {
+            "domains": ["greenslot-backend.onrender.com", "greenslot-backend-test.onrender.com"],
+            "includeSubdomains": true,
+            "allowCleartext": false
+          }
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
