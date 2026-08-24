@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "GreenSlot",
-    "slug": "greenslot-mobile",
+    "slug": "thongcao123",
     "scheme": "greenslot",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,7 +32,7 @@
     "extra": {
       "apiUrl": "http://10.10.10.254:8080/api",
       "eas": {
-        "projectId": "06829a8c-f0a0-4ab5-9bba-0a32f4fbd2f0"
+        "projectId": "19bdf3aa-9d82-4d82-8a2f-26f9be0c8b08"
       }
     },
     "plugins": [
