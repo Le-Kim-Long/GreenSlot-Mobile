@@ -8,9 +8,11 @@ import TaskManagementScreen from '../screens/staff/TaskManagementScreen';
 import StaffListScreen from '../screens/staff/StaffListScreen';
 import GardenStaffAccountScreen from '../screens/garden-staff/GardenStaffAccountScreen';
 import IoTMonitoringScreen from '../screens/customer/IoTMonitoringScreen';
+import IoTDetailScreen from '@/screens/customer/IoTDetailScreen';
 import type { GardenStaffTabParamList, GardenStaffStackParamList } from './types';
 import GardenStaffAlertScreen from '@/screens/garden-staff/GardenStaffAlertScreen';
 import IoTOperationsScreen from '../screens/staff/IoTOperationsScreen';
+
 
 const Tab = createBottomTabNavigator<GardenStaffTabParamList>();
 const Stack = createNativeStackNavigator<GardenStaffStackParamList>();
@@ -84,6 +86,11 @@ export function GardenStaffStack() {
         name="IoTMonitoring"
         component={IoTMonitoringScreen}
         options={{ title: 'Giám sát chỉ số IoT' }}
+      />
+      <Stack.Screen
+        name="IoTDetail"
+        component={IoTDetailScreen}
+        options={{ title: 'Chi tiết cảm biến' }}
       />
       <Stack.Screen
         name="GardenStaffAlert"

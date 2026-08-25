@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Leaf, Clock, CreditCard, ChevronRight } from 'lucide-react-native';
+import { Leaf, Clock, CreditCard, ChevronRight, Bell } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
+import { notificationApi } from '../../api/notificationApi';
 import type { BookingHistory } from '../../types/api';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
@@ -31,6 +32,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [repayingId, setRepayingId] = useState<number | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +50,12 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   useFocusEffect(
     useCallback(() => {
       load();
+      // Also refresh unread notifications
+      notificationApi.getUnreadCount()
+        .then(res => { if (typeof res?.unreadCount === 'number') setUnreadCount(res.unreadCount); })
+        .catch(() => notificationApi.getMyNotifications().then(list => {
+          if (Array.isArray(list)) setUnreadCount(list.filter(n => !n.isRead).length);
+        }).catch(() => {}));
     }, [load])
   );
 
@@ -149,7 +157,21 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Vườn đang thuê</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.title}>Vườn đang thuê</Text>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => navigation.getParent()?.navigate('Notifications')}
+            activeOpacity={0.7}
+          >
+            <Bell size={20} color={colors.gray[700]} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
         {pendingPaymentCount > 0 && (
           <View style={styles.pendingBanner}>
             <Clock size={14} color={colors.orange[600] ?? '#ea580c'} />
@@ -298,7 +320,11 @@ const ORANGE = '#ea580c';
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  title: { ...typography.heading2, color: colors.gray[900] },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  title: { ...typography.heading2, color: colors.gray[900], flex: 1 },
+  bellButton: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.gray[100] },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' },
+  badgeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
 
   // Pending banner
   pendingBanner: {

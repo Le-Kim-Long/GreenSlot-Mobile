@@ -7,35 +7,24 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
-import { Thermometer, Droplets, Sun, Wind, Activity, MapPin, Sprout } from 'lucide-react-native';
-import { iotApi, IOT_DEVICE_ID } from '../../api/iotApi';
+import {
+  Cpu,
+  MapPin,
+  ChevronDown,
+  CheckCircle2,
+  ChevronRight,
+  TrendingUp,
+} from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { bookingApi } from '../../api/bookingApi';
-import type { BookingHistory, SensorReadingResponseDTO } from '../../types/api';
+import type { CustomerStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { EmptyState } from '../../components/common/EmptyState';
-import { colors } from '../../theme/colors';
-import { typography, spacing, radius } from '../../theme/typography';
+import { spacing } from '../../theme/typography';
 
-const SENSOR_ICONS: Record<string, typeof Thermometer> = {
-  TEMPERATURE: Thermometer,
-  HUMIDITY: Droplets,
-  SOIL_MOISTURE: Droplets,
-  LIGHT: Sun,
-  CO2: Wind,
-  PH: Activity,
-};
-
-const SENSOR_NAMES_VI: Record<string, string> = {
-  TEMPERATURE: 'Nhiệt độ không khí',
-  HUMIDITY: 'Độ ẩm không khí',
-  SOIL_MOISTURE: 'Độ ẩm đất canh tác',
-  LIGHT: 'Cường độ ánh sáng',
-  CO2: 'Nồng độ khí CO2',
-  PH: 'Độ pH dung dịch dinh dưỡng',
-};
-
-const POLL_INTERVAL = 15000;
+const POLL_INTERVAL = 10000;
 
 interface RentedSlotOption {
   slotId: number;
@@ -43,235 +32,545 @@ interface RentedSlotOption {
   locationName?: string;
   treeName?: string;
   pillarCode?: string;
+  pillarId?: number;
+  pillarType?: string;
+  capacityHoles?: number;
 }
 
+// ─────────────────────────────────────────────────────
+// SIMPLIFIED PILLAR CARD (Shows basic info only)
+// ─────────────────────────────────────────────────────
+function PillarSummaryCard({
+  rental,
+  onViewDetail,
+}: {
+  rental: RentedSlotOption;
+  onViewDetail: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.summaryCard}
+      onPress={onViewDetail}
+      activeOpacity={0.85}
+    >
+      {/* Header row: Online dot + Detail button */}
+      <View style={styles.summaryCardHeader}>
+        <View style={styles.summaryCardLeft}>
+          <View style={styles.pillarTitleRow}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.pillarCodeText}>Trụ {rental.pillarCode || 'ESP32'}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.detailBtn}
+          onPress={onViewDetail}
+          activeOpacity={0.8}
+        >
+          <TrendingUp size={13} color='#16A34A' />
+          <Text style={styles.detailBtnText}>Biểu đồ</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Info rows - each on its own line */}
+      <View style={styles.infoBlock}>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Ô vườn:</Text>
+          <View style={styles.slotPill}>
+            <Text style={styles.slotPillText}>Ô {rental.slotNumber}</Text>
+          </View>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Giống cây:</Text>
+          <Text style={styles.infoValue}>{rental.treeName || 'Chưa trồng'}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Số hốc:</Text>
+          <Text style={styles.infoValue}>{rental.capacityHoles || 24} hốc</Text>
+        </View>
+        {rental.locationName && (
+          <View style={styles.infoRow}>
+            <MapPin size={11} color='#94A3B8' />
+            <Text style={styles.locText}>{rental.locationName}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.onlineRow}>
+        <CheckCircle2 size={12} color='#16A34A' />
+        <Text style={styles.onlineText}>Online</Text>
+        <ChevronRight size={14} color='#94A3B8' style={{ marginLeft: 'auto' }} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─────────────────────────────────────────────────────
+// MAIN SCREEN (List view with Dropdown Filter)
+// ─────────────────────────────────────────────────────
 export default function IoTMonitoringScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
+
   const [rentals, setRentals] = useState<RentedSlotOption[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<RentedSlotOption | null>(null);
-  const [readings, setReadings] = useState<SensorReadingResponseDTO[]>([]);
+  const [filterSlotId, setFilterSlotId] = useState<string>('all');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load user's active rented slots
+  // Load active rentals (expand pillars list)
   const loadRentals = useCallback(async () => {
     try {
       const history = await bookingApi.getHistory();
       const active = history.filter(r => r.status === 'ACTIVE');
       const options: RentedSlotOption[] = [];
+      
       active.forEach(r => {
         const slotId = r.slotId || r.id;
-        options.push({
-          slotId,
-          slotNumber: r.slotNumber,
-          locationName: r.locationName,
-          treeName: r.treeName,
-          pillarCode: r.pillarCode || (r.pillars?.[0]?.pillarCode),
-        });
+        const pillarsList = r.pillars || [];
+        
+        if (pillarsList.length > 0) {
+          // Add each pillar as a separate option, filtering out arduino-greenhouse-01
+          pillarsList.forEach(pillar => {
+            if (pillar.pillarCode && pillar.pillarCode !== 'arduino-greenhouse-01') {
+              options.push({
+                slotId,
+                slotNumber: r.slotNumber,
+                locationName: r.locationName,
+                treeName: r.treeName,
+                pillarCode: pillar.pillarCode,
+                pillarId: pillar.id,
+                pillarType: pillar.pillarType || 'Trụ Canh Tác',
+                capacityHoles: pillar.capacityHoles || 24,
+              });
+            }
+          });
+        } else if (r.pillarCode && r.pillarCode !== 'arduino-greenhouse-01') {
+          // Fallback if pillars array is empty but pillarCode exists and is not arduino
+          options.push({
+            slotId,
+            slotNumber: r.slotNumber,
+            locationName: r.locationName,
+            treeName: r.treeName,
+            pillarCode: r.pillarCode,
+            pillarType: 'Trụ Canh Tác',
+            capacityHoles: 24,
+          });
+        }
       });
       setRentals(options);
-      if (options.length > 0 && !selectedSlot) {
-        setSelectedSlot(options[0]);
-      }
     } catch {
       setRentals([]);
     }
-  }, [selectedSlot]);
+  }, []);
 
-  // Load sensors for selected slot or fallback device
-  const loadReadings = useCallback(async () => {
-    try {
-      let data: SensorReadingResponseDTO[] = [];
-      if (selectedSlot?.slotId) {
-        data = await iotApi.getLatestBySlot(selectedSlot.slotId);
-      }
-      if (!data || data.length === 0) {
-        data = await iotApi.getLatestReadings(IOT_DEVICE_ID);
-      }
-      setReadings(data || []);
-      setLastUpdate(new Date().toLocaleTimeString('vi-VN'));
-    } catch {
-      setReadings([]);
-    }
-  }, [selectedSlot]);
+  // Poll update timestamp simulation
+  const checkStatus = useCallback(() => {
+    setLastUpdate(new Date().toLocaleTimeString('vi-VN'));
+  }, []);
 
   useEffect(() => {
     loadRentals().finally(() => setLoading(false));
   }, [loadRentals]);
 
   useEffect(() => {
-    if (selectedSlot) {
-      loadReadings();
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = setInterval(loadReadings, POLL_INTERVAL);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [selectedSlot, loadReadings]);
+    checkStatus();
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(checkStatus, POLL_INTERVAL);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [checkStatus]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadRentals();
-    await loadReadings();
+    checkStatus();
     setRefreshing(false);
   };
 
+  // Filter logic - Filter by matching slotId & pillarCode
+  const filteredRentals = filterSlotId === 'all' 
+    ? rentals 
+    : rentals.filter(r => `${r.slotId}-${r.pillarCode}` === filterSlotId);
+
+  const getSelectedLabel = () => {
+    if (filterSlotId === 'all') return 'Tất cả các trụ (Bảng tổng hợp)';
+    const selected = rentals.find(r => `${r.slotId}-${r.pillarCode}` === filterSlotId);
+    if (!selected) return 'Tất cả các trụ (Bảng tổng hợp)';
+    return `Trụ ${selected.pillarCode} - Ô ${selected.slotNumber}`;
+  };
+
   if (loading) return <LoadingScreen />;
+  if (rentals.length === 0) {
+    return (
+      <EmptyState
+        title='Chưa có ô vườn đang thuê'
+        subtitle='Bạn cần ít nhất một hợp đồng thuê đang hoạt động để giám sát IoT.'
+      />
+    );
+  }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green[600]} />}
-    >
-      {/* Slot / Pillar Selector */}
-      {rentals.length > 0 && (
-        <View style={styles.selectorWrapper}>
-          <Text style={styles.sectionTitle}>Chọn ô vườn cần giám sát</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotList}>
-            {rentals.map((item, index) => {
-              const isSelected = selectedSlot?.slotId === item.slotId;
+    <View style={{ flex: 1 }}>
+      {/* ── HEADER CONTROL PANEL ── */}
+      <View style={[styles.controlPanel, { zIndex: 100 }]}>
+        <View style={styles.controlTop}>
+          <View style={styles.controlIconBox}>
+            <Cpu size={22} color='#16A34A' />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.controlTitle}>Giám Sát Trụ IoT</Text>
+            <Text style={styles.controlSubtitle}>
+              Chọn trụ bên dưới để kiểm tra chỉ số chi tiết và biểu đồ đo đạc
+            </Text>
+          </View>
+        </View>
+
+        {/* Label selector */}
+        <Text style={styles.selectorLabel}>THIẾT BỊ / TRỤ GIÁM SÁT:</Text>
+
+        {/* Dropdown Trigger Button */}
+        <TouchableOpacity
+          style={styles.dropdownTrigger}
+          onPress={() => setDropdownOpen(!dropdownOpen)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.dropdownTriggerText} numberOfLines={1}>
+            {filterSlotId === 'all' ? '🌐 ' : '🌱 '}
+            {getSelectedLabel()}
+          </Text>
+          <ChevronDown size={16} color='#475569' style={{ marginLeft: 8 }} />
+        </TouchableOpacity>
+
+        {/* Simulated Dropdown Menu - absolute overlay */}
+        {dropdownOpen && (
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity
+              style={[styles.dropdownItem, filterSlotId === 'all' && styles.dropdownItemActive]}
+              onPress={() => {
+                setFilterSlotId('all');
+                setDropdownOpen(false);
+              }}
+            >
+              <Text style={[styles.dropdownItemText, filterSlotId === 'all' && styles.dropdownItemTextActive]}>
+                🌐 Tất cả các trụ (Bảng tổng hợp)
+              </Text>
+            </TouchableOpacity>
+            {rentals.map((item, idx) => {
+              const itemKey = `${item.slotId}-${item.pillarCode}`;
+              const isSel = filterSlotId === itemKey;
               return (
                 <TouchableOpacity
-                  key={`${item.slotId}-${index}`}
-                  style={[styles.slotChip, isSelected && styles.slotChipActive]}
-                  onPress={() => setSelectedSlot(item)}
+                  key={`${itemKey}-${idx}`}
+                  style={[styles.dropdownItem, isSel && styles.dropdownItemActive]}
+                  onPress={() => {
+                    setFilterSlotId(itemKey);
+                    setDropdownOpen(false);
+                  }}
                 >
-                  <Text style={[styles.slotChipText, isSelected && styles.slotChipTextActive]}>
-                    Ô {item.slotNumber} {item.pillarCode ? `· Trụ ${item.pillarCode}` : ''}
+                  <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextActive]}>
+                    🌱 Trụ {item.pillarCode} - Ô {item.slotNumber} ({item.capacityHoles || 24} hốc)
                   </Text>
-                  {item.treeName && (
-                    <Text style={[styles.slotChipTree, isSelected && styles.slotChipTreeActive]}>
-                      🌱 {item.treeName}
-                    </Text>
-                  )}
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Header Info */}
-      <View style={styles.headerInfo}>
-        <View>
-          <Text style={styles.deviceLabel}>
-            {selectedSlot ? `Giám sát Ô ${selectedSlot.slotNumber}` : `Thiết bị: ${IOT_DEVICE_ID}`}
-          </Text>
-          {selectedSlot?.locationName && (
-            <Text style={styles.locationSub}>📍 {selectedSlot.locationName}</Text>
-          )}
-        </View>
-        {lastUpdate ? <Text style={styles.updateTime}>Cập nhật: {lastUpdate}</Text> : null}
+          </View>
+        )}
       </View>
 
-      {/* Sensor Readings List */}
-      {readings.length === 0 ? (
-        <EmptyState
-          title="Không có dữ liệu cảm biến"
-          subtitle="Hệ thống IoT đang thu thập thông số hoặc đang hiệu chuẩn cảm biến"
-        />
-      ) : (
-        readings.map(r => {
-          const Icon = SENSOR_ICONS[r.sensorType] || Thermometer;
-          const sensorTitle = SENSOR_NAMES_VI[r.sensorType] || r.sensorDescription || r.sensorType;
-          return (
-            <Card key={r.id} style={styles.sensorCard}>
-              <View style={styles.sensorHeader}>
-                <View style={styles.sensorIcon}>
-                  <Icon size={22} color={colors.green[600]} />
-                </View>
-                <View style={styles.sensorInfo}>
-                  <Text style={styles.sensorName}>{sensorTitle}</Text>
-                  <Text style={styles.sensorTime}>
-                    {new Date(r.recordedAt).toLocaleString('vi-VN')}
-                  </Text>
-                </View>
-                <View style={styles.sensorValueBox}>
-                  <Text style={styles.sensorValue}>{r.value.toFixed(1)}</Text>
-                  <Text style={styles.sensorUnit}>{r.unit}</Text>
-                </View>
-              </View>
-            </Card>
-          );
-        })
-      )}
-    </ScrollView>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor='#16A34A' />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── STATUS BAR ── */}
+        <View style={styles.statusBar}>
+          <View style={styles.statusLeft}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>
+              Đang hiển thị {filteredRentals.length} trụ giám sát
+            </Text>
+          </View>
+          <Text style={styles.updateTime}>
+            {lastUpdate ? `Cập nhật: ${lastUpdate}` : 'Đang kết nối...'}
+          </Text>
+        </View>
+
+        {/* ══ PILLARS LIST ══════════════════════════ */}
+        <View>
+          {filteredRentals.map((r, idx) => (
+            <PillarSummaryCard
+              key={`${r.slotId}-${r.pillarCode}-${idx}`}
+              rental={r}
+              onViewDetail={() => navigation.navigate('IoTDetail', { slotId: r.slotId })}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  selectorWrapper: { marginBottom: spacing.md },
-  sectionTitle: {
-    ...typography.caption,
-    color: colors.gray[500],
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-    fontFamily: 'Inter_600SemiBold',
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  slotList: { gap: spacing.sm, paddingVertical: 4 },
-  slotChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: colors.green[200],
-  },
-  slotChipActive: {
-    backgroundColor: colors.green[600],
-    borderColor: colors.green[700],
-  },
-  slotChipText: {
-    fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.gray[800],
-  },
-  slotChipTextActive: {
-    color: colors.white,
-  },
-  slotChipTree: {
-    fontSize: 10,
-    fontFamily: 'Inter_400Regular',
-    color: colors.green[700],
-    marginTop: 2,
-  },
-  slotChipTreeActive: {
-    color: colors.green[100],
-  },
-  headerInfo: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    backgroundColor: colors.green[50],
+  content: {
     padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.green[100],
+    paddingBottom: spacing.xxl,
   },
-  deviceLabel: { ...typography.label, color: colors.green[800] },
-  locationSub: { ...typography.caption, color: colors.gray[600], marginTop: 2 },
-  updateTime: { ...typography.caption, color: colors.green[700], fontFamily: 'Inter_500Medium' },
-  sensorCard: { marginBottom: spacing.sm },
-  sensorHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  sensorIcon: {
+  controlPanel: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: spacing.md,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: spacing.sm,
+    zIndex: 100,
+    position: 'relative',
+  },
+  controlTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: spacing.md,
+  },
+  controlIconBox: {
     width: 44,
     height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.green[50],
+    borderRadius: 14,
+    backgroundColor: '#F0FDF4',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sensorInfo: { flex: 1 },
-  sensorName: { ...typography.label, color: colors.gray[900] },
-  sensorTime: { ...typography.caption, color: colors.gray[400] },
-  sensorValueBox: { alignItems: 'flex-end' },
-  sensorValue: { ...typography.heading2, color: colors.green[600] },
-  sensorUnit: { ...typography.caption, color: colors.gray[500] },
+  controlTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    color: '#1E293B',
+  },
+  controlSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  selectorLabel: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+    color: '#94A3B8',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#22C55E',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  dropdownTriggerText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: '#1E293B',
+    flex: 1,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 10,
+    zIndex: 200,
+  },
+  dropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  dropdownItemText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#475569',
+  },
+  dropdownItemTextActive: {
+    fontFamily: 'Inter_600SemiBold',
+    color: '#2563EB',
+  },
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(22,163,74,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(22,163,74,0.15)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: spacing.md,
+  },
+  statusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+  statusText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    color: '#14532D',
+  },
+  updateTime: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    color: '#16A34A',
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  summaryCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryCardLeft: {
+    flex: 1,
+  },
+  pillarTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+  pillarCodeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  infoBlock: {
+    marginBottom: 8,
+    gap: 5,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 14,
+  },
+  infoLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    color: '#94A3B8',
+    minWidth: 62,
+  },
+  infoValue: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: '#334155',
+  },
+  slotPill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  slotPillText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+    color: '#15803D',
+  },
+  pillarSubLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: '#94A3B8',
+    marginLeft: 14,
+  },
+  detailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  detailBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: '#16A34A',
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    marginBottom: 8,
+    paddingLeft: 14,
+  },
+  locText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    color: '#64748B',
+  },
+  onlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  onlineText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    color: '#16A34A',
+  },
 });

@@ -23,7 +23,10 @@ export const iotApi = {
   },
 
   getLatestBySlot: (slotId: number): Promise<SensorReadingResponseDTO[]> =>
-    apiClient.get('/iot/sensors/latest', { params: { slotId } }).then((r) => r.data),
+    apiClient.get(`/iot/sensors/slot/${slotId}/latest`).then((r) => r.data),
+
+  getHistoryBySlot: (slotId: number, limit = 50): Promise<SensorReadingResponseDTO[]> =>
+    apiClient.get(`/iot/sensors/slot/${slotId}/history`, { params: { limit } }).then((r) => r.data),
 
   getReadingsHistory: (params: { deviceId?: string; pillarId?: number; slotId?: number; sensorType?: string; from?: string; to?: string } = {}): Promise<SensorReadingResponseDTO[]> =>
     apiClient.get('/iot/sensors/history', { params: { deviceId: IOT_DEVICE_ID, ...params } }).then((r) => r.data),

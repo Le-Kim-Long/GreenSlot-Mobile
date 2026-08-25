@@ -1,5 +1,7 @@
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   User,
   Wifi,
@@ -8,8 +10,10 @@ import {
   LayoutDashboard,
   LogOut,
   ChevronRight,
+  Bell,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { notificationApi } from '../../api/notificationApi';
 import { roleLabel } from '../../utils/roleMap';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -19,6 +23,19 @@ import type { CustomerTabProps } from '../../navigation/types';
 
 export default function AccountScreen({ navigation }: CustomerTabProps<'Account'>) {
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      notificationApi.getUnreadCount()
+        .then(res => { if (mounted && typeof res?.unreadCount === 'number') setUnreadCount(res.unreadCount); })
+        .catch(() => notificationApi.getMyNotifications().then(list => {
+          if (mounted && Array.isArray(list)) setUnreadCount(list.filter(n => !n.isRead).length);
+        }).catch(() => {}));
+      return () => { mounted = false; };
+    }, [])
+  );
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', screen: 'CustomerDashboard' as const },
@@ -37,7 +54,21 @@ export default function AccountScreen({ navigation }: CustomerTabProps<'Account'
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Tài khoản</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.title}>Tài khoản</Text>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => navigation.getParent()?.navigate('Notifications')}
+            activeOpacity={0.7}
+          >
+            <Bell size={20} color={colors.gray[700]} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
         <Card style={styles.profileCard}>
           <View style={styles.avatar}>
@@ -81,7 +112,11 @@ export default function AccountScreen({ navigation }: CustomerTabProps<'Account'
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  title: { ...typography.heading2, color: colors.gray[900], marginBottom: spacing.lg },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
+  title: { ...typography.heading2, color: colors.gray[900], flex: 1 },
+  bellButton: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.gray[100] },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' },
+  badgeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
   profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.xl },
   avatar: {
     width: 64,

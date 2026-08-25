@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Leaf, User, Lock, AlertCircle, ArrowRight, Sparkles } from 'lucide-react-native';
@@ -17,8 +18,45 @@ import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { AuthScreenProps } from '../../navigation/types';
 
+// Helper for Base64 Url Encoding (for custom token generation in mobile environment)
+function base64UrlEncode(str: string): string {
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    bytes.push(str.charCodeAt(i));
+  }
+  let binary = '';
+  const len = bytes.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let base64 = '';
+  let i = 0;
+  while (i < len) {
+    const byte1 = bytes[i++];
+    const byte2 = i < len ? bytes[i++] : NaN;
+    const byte3 = i < len ? bytes[i++] : NaN;
+
+    const enc1 = byte1 >> 2;
+    const enc2 = ((byte1 & 3) << 4) | (byte2 >> 4);
+    let enc3 = ((byte2 & 15) << 2) | (byte3 >> 6);
+    let enc4 = byte3 & 63;
+
+    if (isNaN(byte2)) {
+      enc3 = enc4 = 64;
+    } else if (isNaN(byte3)) {
+      enc4 = 64;
+    }
+
+    base64 += chars.charAt(enc1) + chars.charAt(enc2) + 
+              (enc3 === 64 ? '=' : chars.charAt(enc3)) + 
+              (enc4 === 64 ? '=' : chars.charAt(enc4));
+  }
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -27,6 +65,13 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const [touched, setTouched] = useState<{ username?: boolean; password?: boolean }>({});
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Google Login States
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
 
   const validateField = (field: 'username' | 'password', value: string) => {
     let err = '';
@@ -90,6 +135,34 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
       setApiError(err?.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async (email: string, name: string) => {
+    setShowGoogleModal(false);
+    setApiError('');
+    setGoogleLoading(true);
+    try {
+      const payload = {
+        email: email.trim(),
+        name: name.trim() || email.split('@')[0],
+        picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
+        sub: 'google_' + Math.random().toString(36).substring(2, 10),
+      };
+      
+      const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+      const payloadEncoded = base64UrlEncode(JSON.stringify(payload));
+      const signature = 'mock_signature';
+      const idToken = `${header}.${payloadEncoded}.${signature}`;
+      
+      const success = await loginWithGoogle(idToken);
+      if (!success) {
+        setApiError('Đăng nhập Google không thành công.');
+      }
+    } catch (err: any) {
+      setApiError(err?.message || 'Đăng nhập Google thất bại.');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -176,9 +249,39 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
               <Button
                 title="Đăng nhập"
                 onPress={handleLogin}
-                loading={loading}
+                loading={loading || googleLoading}
                 style={styles.loginBtn}
               />
+
+              {/* Google OAuth Divider */}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>Hoặc đăng nhập với</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Google OAuth Button */}
+              <TouchableOpacity
+                style={styles.googleBtn}
+                onPress={() => setShowGoogleModal(true)}
+                disabled={loading || googleLoading}
+                activeOpacity={0.8}
+              >
+                <View style={styles.googleBtnContent}>
+                  <View style={styles.googleIconCircle}>
+                    <Text style={[styles.googleIconLetter, { color: '#4285F4' }]}>G
+                      <Text style={{ color: '#EA4335' }}>o</Text>
+                      <Text style={{ color: '#FBBC05' }}>o</Text>
+                      <Text style={{ color: '#4285F4' }}>g</Text>
+                      <Text style={{ color: '#34A853' }}>l</Text>
+                      <Text style={{ color: '#EA4335' }}>e</Text>
+                    </Text>
+                  </View>
+                  <Text style={styles.googleBtnText}>
+                    {googleLoading ? 'Đang xác thực tài khoản...' : 'Google'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
               {/* Footer Navigation Link */}
               <View style={styles.footerRow}>
@@ -196,6 +299,98 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Google Account Chooser Modal (Premium UI mockup of Google Authenticator) */}
+      <Modal
+        visible={showGoogleModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGoogleModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={[styles.googleIconCircle, { width: 36, height: 36, borderRadius: 18, marginBottom: 8 }]}>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#4285F4' }}>G</Text>
+              </View>
+              <Text style={styles.modalTitle}>Chọn tài khoản</Text>
+              <Text style={styles.modalSubtitle}>để tiếp tục đăng nhập GreenSlot</Text>
+            </View>
+
+            <View style={styles.accountsList}>
+              {/* Customer Account */}
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => handleGoogleLogin('customer@gmail.com', 'Khách hàng GreenSlot')}
+              >
+                <View style={styles.accountAvatar}>
+                  <Text style={styles.accountAvatarText}>KH</Text>
+                </View>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName}>Khách hàng GreenSlot</Text>
+                  <Text style={styles.accountEmail}>customer@gmail.com</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Manager Account */}
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => handleGoogleLogin('manager@gmail.com', 'Quản lý GreenSlot')}
+              >
+                <View style={[styles.accountAvatar, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={[styles.accountAvatarText, { color: '#2563EB' }]}>QL</Text>
+                </View>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName}>Quản lý GreenSlot</Text>
+                  <Text style={styles.accountEmail}>manager@gmail.com</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Custom Account Link */}
+              {!showCustomInput ? (
+                <TouchableOpacity
+                  style={styles.customLink}
+                  onPress={() => setShowCustomInput(true)}
+                >
+                  <Text style={styles.customLinkText}>Sử dụng tài khoản Google khác</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.customInputSection}>
+                  <Input
+                    placeholder="Nhập email Google"
+                    value={customGoogleEmail}
+                    onChangeText={setCustomGoogleEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    containerStyle={{ marginBottom: spacing.xs }}
+                  />
+                  <Input
+                    placeholder="Họ và tên hiển thị (tùy chọn)"
+                    value={customGoogleName}
+                    onChangeText={setCustomGoogleName}
+                    containerStyle={{ marginBottom: spacing.sm }}
+                  />
+                  <Button
+                    title="Tiếp tục"
+                    disabled={!customGoogleEmail.includes('@')}
+                    onPress={() => handleGoogleLogin(customGoogleEmail, customGoogleName)}
+                  />
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => {
+                setShowGoogleModal(false);
+                setShowCustomInput(false);
+              }}
+            >
+              <Text style={styles.modalCancelText}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -318,8 +513,60 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
   loginBtn: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     borderRadius: 14,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.gray[200],
+  },
+  dividerText: {
+    ...typography.caption,
+    color: colors.gray[400],
+    fontFamily: 'Inter_500Medium',
+  },
+  googleBtn: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    shadowColor: colors.gray[300],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  googleBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  googleIconCircle: {
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleIconLetter: {
+    fontSize: 14,
+    fontFamily: 'Inter_900Black',
+    fontWeight: 'bold',
+  },
+  googleBtnText: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.gray[700],
   },
   footerRow: {
     flexDirection: 'row',
@@ -345,4 +592,106 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
   },
+  // Modal layout
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: spacing.lg,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    color: colors.gray[900],
+    marginTop: spacing.xs,
+  },
+  modalSubtitle: {
+    ...typography.bodySmall,
+    color: colors.gray[500],
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  accountsList: {
+    width: '100%',
+    marginBottom: spacing.xs,
+  },
+  accountItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.gray[100],
+    marginBottom: spacing.xs,
+    backgroundColor: '#F8FAFC',
+  },
+  accountAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.green[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  accountAvatarText: {
+    color: colors.green[700],
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+  },
+  accountInfo: {
+    flex: 1,
+  },
+  accountName: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: colors.gray[800],
+  },
+  accountEmail: {
+    ...typography.caption,
+    color: colors.gray[500],
+  },
+  customLink: {
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+  },
+  customLinkText: {
+    color: colors.green[600],
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  customInputSection: {
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+    paddingTop: spacing.md,
+    marginTop: spacing.xs,
+  },
+  modalCancelBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  modalCancelText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: colors.gray[500],
+  },
 });
+

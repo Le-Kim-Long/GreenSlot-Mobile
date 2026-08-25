@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (username: string, name: string, email: string, password: string, phone?: string, address?: string) => Promise<string | true>;
+  loginWithGoogle: (idToken: string) => Promise<boolean>;
   loginWithJwtData: (data: import('../types/api').JwtResponse) => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -81,6 +82,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (idToken: string): Promise<boolean> => {
+    try {
+      const data = await authApi.googleLogin({ idToken });
+      if (data?.token) {
+        await loginWithJwtData(data);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.warn('Google login request failed:', err);
+      return false;
+    }
+  };
+
   const register = async (
     username: string,
     name: string,
@@ -126,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         register,
+        loginWithGoogle,
         loginWithJwtData,
         isAuthenticated: !!user,
       }}
