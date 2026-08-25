@@ -11,7 +11,7 @@ const USER_KEY = 'greenslot_user';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<string | true>;
   logout: () => Promise<void>;
   register: (username: string, name: string, email: string, password: string, phone?: string, address?: string) => Promise<string | true>;
   loginWithGoogle: (idToken: string) => Promise<boolean>;
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<string | true> => {
     try {
       const data = await authApi.login({ username, password });
       if (data?.token) {
@@ -76,9 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(loggedUser);
         return true;
       }
-      return false;
-    } catch {
-      return false;
+      return 'Không nhận được mã xác thực từ máy chủ';
+    } catch (error: unknown) {
+      return getApiErrorMessage(error, 'Tên đăng nhập hoặc mật khẩu không chính xác');
     }
   };
 

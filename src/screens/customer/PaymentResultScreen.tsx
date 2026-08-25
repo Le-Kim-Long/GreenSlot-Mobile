@@ -74,7 +74,8 @@ export default function PaymentResultScreen({
   navigation,
 }: CustomerStackProps<'PaymentResult'>) {
   const params = route.params ?? {};
-  const status = params.status ?? 'pending';
+  const isSuccess = params.status === 'success' || (params as any).responseCode === '00' || (params as any).vnp_ResponseCode === '00';
+  const status: PaymentStatus = isSuccess ? 'success' : (params.status === 'failed' ? 'failed' : 'pending');
   const { slotNumber, amount, txnRef, orderInfo } = params;
 
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;

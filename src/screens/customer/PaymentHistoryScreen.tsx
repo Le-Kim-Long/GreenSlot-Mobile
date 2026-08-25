@@ -27,7 +27,7 @@ import {
 } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { bookingApi } from '../../api/bookingApi';
-import { apiClient } from '../../api/client';
+import { apiClient, resolveApiBaseUrl } from '../../api/client';
 import type { PaymentTransactionInfo, PillarDetail } from '../../types/api';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
@@ -127,7 +127,7 @@ export default function PaymentHistoryScreen() {
 
   const handleDownloadInvoice = async (txn: PaymentItem) => {
     try {
-      const baseUrl = apiClient.defaults.baseURL?.replace(/\/$/, '') || 'http://10.10.10.254:8080/api';
+      const baseUrl = apiClient.defaults.baseURL?.replace(/\/$/, '') || resolveApiBaseUrl();
       const invoiceUrl = `${baseUrl}/invoices/payment/${txn.id}`;
       await WebBrowser.openBrowserAsync(invoiceUrl);
     } catch {

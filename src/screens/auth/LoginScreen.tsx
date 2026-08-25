@@ -127,9 +127,9 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     setApiError('');
     setLoading(true);
     try {
-      const ok = await login(username.trim(), password);
-      if (!ok) {
-        setApiError('Tên đăng nhập hoặc mật khẩu không chính xác');
+      const result = await login(username.trim(), password);
+      if (result !== true) {
+        setApiError(typeof result === 'string' ? result : 'Tên đăng nhập hoặc mật khẩu không chính xác');
       }
     } catch (err: any) {
       setApiError(err?.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.');
