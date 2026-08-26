@@ -10,9 +10,10 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
+import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
 import { Sprout, Plus, Search, Calendar, ChevronRight, X, AlertCircle, CreditCard, CheckCircle } from 'lucide-react-native';
 import { treeApi, treePlantingApi } from '../../api/treeApi';
 import { bookingApi } from '../../api/bookingApi';
@@ -20,8 +21,11 @@ import type { TreeDTO, TreePlantingRequestDTO, BookingHistory, PillarDetail } fr
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { colors } from '../../theme/colors';
 import { spacing, radius } from '../../theme/typography';
+import type { CustomerStackProps } from '../../navigation/types';
 
-export default function CustomerTreePlantingScreen() {
+export default function CustomerTreePlantingScreen({ navigation, route }: CustomerStackProps<'CustomerTreePlanting'>) {
+  const initialRentalId = (route?.params as any)?.rentalId as number | undefined;
+
   const [requests, setRequests] = useState<TreePlantingRequestDTO[]>([]);
   const [activeRentals, setActiveRentals] = useState<BookingHistory[]>([]);
   const [activeTrees, setActiveTrees] = useState<TreeDTO[]>([]);
@@ -59,7 +63,16 @@ export default function CustomerTreePlantingScreen() {
 
       if (reqs.status === 'fulfilled') setRequests(reqs.value);
       if (history.status === 'fulfilled') {
-        setActiveRentals(history.value.filter((r) => r.status === 'ACTIVE' || r.status === 'PAID'));
+        const actives = history.value.filter((r) => r.status === 'ACTIVE' || r.status === 'PAID');
+        setActiveRentals(actives);
+        // Auto-select rental if navigated with rentalId param
+        if (initialRentalId) {
+          const preselected = actives.find(r => r.id === initialRentalId);
+          if (preselected) {
+            setSelectedRental(preselected);
+            setIsCreateOpen(true);
+          }
+        }
       }
       if (trees.status === 'fulfilled') setActiveTrees(trees.value);
     } catch (err) {
@@ -73,72 +86,134 @@ export default function CustomerTreePlantingScreen() {
     fetchData();
   }, []);
 
+  const getRemainingDays = (endDateStr?: string) => {
+    if (!endDateStr) return 0;
+    let end: Date;
+    if (endDateStr.includes('/')) {
+      const parts = endDateStr.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts.map(p => parseInt(p, 10));
+        end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      } else {
+        end = new Date(endDateStr);
+      }
+    } else {
+      end = new Date(endDateStr);
+    }
+    if (isNaN(end.getTime())) return 0;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const diffTime = end.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  const getTreePriceForPillarCapacity = (tree: TreeDTO | null, holes: number = 24) => {
+    if (!tree) return 0;
+    const price = tree.price || 0;
+    const priceLarge = (tree as any).priceLarge;
+    const priceMedium = (tree as any).priceMedium;
+    const priceSmall = (tree as any).priceSmall;
+    if (holes >= 48) return Number(priceLarge != null ? priceLarge : (price * 2.0));
+    if (holes >= 36) return Number(priceMedium != null ? priceMedium : (price * 1.5));
+    return Number(priceSmall != null ? priceSmall : price);
+  };
+
+  const getEstimatedCost = () => {
+    if (!selectedTree) return 0;
+    if (selectedPillar) {
+      return getTreePriceForPillarCapacity(selectedTree, selectedPillar.capacityHoles || 24);
+    } else if (selectedRental?.pillars && selectedRental.pillars.length > 0) {
+      return selectedRental.pillars.reduce(
+        (acc, p) => acc + getTreePriceForPillarCapacity(selectedTree, p.capacityHoles || 24),
+        0
+      );
+    } else {
+      const pillarCount = selectedRental?.pillarCodes?.length || selectedRental?.pillars?.length || 1;
+      return getTreePriceForPillarCapacity(selectedTree, 24) * pillarCount;
+    }
+  };
+
+  const remainingDays = selectedRental ? getRemainingDays(selectedRental.endTime || selectedRental.endDate) : 0;
+  const growthDays = selectedTree ? (selectedTree.growthDurationDays || selectedTree.harvestDays || (selectedTree as any).growthTimeDays || (selectedTree as any).growthDays || 0) : 0;
+  const isGrowthExceeded = Boolean(
+    selectedRental && selectedTree && growthDays > 0 && growthDays > remainingDays
+  );
+
+  const estimatedTreeCost = getEstimatedCost();
+
   const handleSubmit = async () => {
     if (!selectedRental || !selectedTree || !reason.trim()) {
       Alert.alert('Lưu ý', 'Vui lòng chọn ô đất, giống cây và điền lý do.');
       return;
     }
 
-    // Kiểm tra thời gian sinh trưởng của cây so với thời hạn thuê còn lại
-    const growthDays = selectedTree.growthDurationDays || selectedTree.harvestDays || (selectedTree as any).growthTimeDays || (selectedTree as any).growthDays || 0;
-    if (growthDays > 0 && (selectedRental.endDate || (selectedRental as any).endTime)) {
-      const endStr = selectedRental.endDate || (selectedRental as any).endTime;
-      const end = new Date(endStr).getTime();
-      const now = new Date().getTime();
-      const remainingDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-
-      if (remainingDays > 0 && growthDays > remainingDays) {
-        Alert.alert(
-          'Không thể gửi yêu cầu',
-          `Thời gian sinh trưởng của giống cây (${growthDays} ngày) vượt quá thời hạn thuê còn lại của ô đất (${remainingDays} ngày). Vui lòng gia hạn hợp đồng trước!`
-        );
-        return;
-      }
+    if (isGrowthExceeded) {
+      Alert.alert(
+        'Không thể gửi yêu cầu',
+        `Thời gian sinh trưởng của giống cây (${growthDays} ngày) vượt quá thời hạn thuê còn lại của ô đất (${remainingDays} ngày). Vui lòng gia hạn hợp đồng trước!`
+      );
+      return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const response = await treePlantingApi.createRequest({
-        rentalId: selectedRental.id,
-        targetPillarId: selectedPillar?.id,
-        newTreeId: selectedTree.id!,
-        reason: reason.trim(),
-        notes: notes.trim() || undefined,
-      });
+    const cost = getEstimatedCost();
+    const pillarCount = selectedPillar ? 1 : (selectedRental.pillars?.length || selectedRental.pillarCodes?.length || 1);
+    const targetDesc = selectedPillar
+      ? `Trụ ${selectedPillar.pillarCode} (${selectedPillar.capacityHoles || 24} hốc)`
+      : `Toàn bộ ${pillarCount} trụ trong ô`;
 
-      if (response.paymentUrl) {
-        Alert.alert(
-          'Thanh toán giống cây',
-          'Yêu cầu đã được tạo. Bạn sẽ được chuyển đến VNPay để hoàn tất thanh toán tiền giống rau.',
-          [
-            { text: 'Để sau', onPress: () => { setIsCreateOpen(false); fetchData(); } },
-            {
-              text: 'Thanh toán ngay',
-              onPress: async () => {
+    Alert.alert(
+      'Xác nhận mua giống & gieo trồng',
+      `Bạn chắc chắn muốn trồng "${selectedTree.treeName}" tại ô ${selectedRental.slotNumber} (${targetDesc})?\n\nChi phí phôi giống: ${formatCurrency(cost)}.\n\nSau khi bấm xác nhận, hệ thống sẽ chuyển sang cổng VNPay để bạn thanh toán tiền phôi giống.`,
+      [
+        { text: 'Hủy bỏ', style: 'cancel' },
+        {
+          text: 'Thanh toán & Gửi',
+          onPress: async () => {
+            setIsSubmitting(true);
+            try {
+              const response = await treePlantingApi.createRequest({
+                rentalId: selectedRental.id,
+                targetPillarId: selectedPillar?.id,
+                newTreeId: selectedTree.id!,
+                reason: reason.trim(),
+                notes: notes.trim() || undefined,
+                isMobile: true,
+                mobileRedirectUrl: getMobileRedirectUrl(),
+              });
+
+              if (response.paymentUrl) {
+                const settled = await openAndWaitForPayment(response.paymentUrl, bookingApi.getHistory, selectedRental.id);
                 setIsCreateOpen(false);
                 fetchData();
-                await Linking.openURL(response.paymentUrl!);
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Thành công', 'Đã gửi yêu cầu trồng cây của bạn đến nhà vườn.');
-        setIsCreateOpen(false);
-        fetchData();
-      }
+                navigation.replace('PaymentResult', {
+                  status: settled.status,
+                  rentalId: selectedRental.id,
+                  slotNumber: selectedRental.slotNumber,
+                  amount: settled.callback?.amount,
+                  txnRef: settled.callback?.txnRef,
+                  orderInfo: settled.callback?.orderInfo
+                });
+              } else {
+                Alert.alert('Thành công', 'Đã gửi yêu cầu trồng cây của bạn đến nhà vườn.');
+                setIsCreateOpen(false);
+                fetchData();
+              }
 
-      setSelectedRental(null);
-      setSelectedPillar(null);
-      setSelectedTree(null);
-      setReason('');
-      setNotes('');
-    } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || 'Không thể gửi yêu cầu. Vui lòng thử lại sau.';
-      Alert.alert('Thất bại', errorMsg);
-    } finally {
-      setIsSubmitting(false);
-    }
+              setSelectedRental(null);
+              setSelectedPillar(null);
+              setSelectedTree(null);
+              setReason('');
+              setNotes('');
+            } catch (error: any) {
+              const errorMsg = error?.response?.data?.message || 'Không thể gửi yêu cầu. Vui lòng thử lại sau.';
+              Alert.alert('Thất bại', errorMsg);
+            } finally {
+              setIsSubmitting(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const getStatusStyle = (status: string) => {
@@ -182,6 +257,21 @@ export default function CustomerTreePlantingScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Stats Cards */}
+      <View style={styles.statsRow}>
+        {[
+          { label: 'Tất cả', count: requests.length, color: colors.green[700], bg: colors.green[50] },
+          { label: 'Chờ duyệt', count: requests.filter(r => r.status === 'PENDING' || r.status === 'PENDING_PAYMENT').length, color: '#d97706', bg: '#fef3c7' },
+          { label: 'Đã duyệt', count: requests.filter(r => r.status === 'APPROVED').length, color: colors.green[700], bg: colors.green[50] },
+          { label: 'Từ chối', count: requests.filter(r => r.status === 'REJECTED').length, color: '#dc2626', bg: '#fee2e2' },
+        ].map((s, i) => (
+          <View key={i} style={[styles.statCard, { backgroundColor: s.bg }]}>
+            <Text style={[styles.statCount, { color: s.color }]}>{s.count}</Text>
+            <Text style={[styles.statLabel, { color: s.color }]}>{s.label}</Text>
+          </View>
+        ))}
+      </View>
+
       {/* Filter Tabs */}
       <View style={styles.tabsContainer}>
         {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((tab) => (
@@ -209,7 +299,7 @@ export default function CustomerTreePlantingScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => {
             const status = getStatusStyle(item.status);
-            const isPendingPay = item.status === 'PENDING_PAYMENT' || Boolean(item.paymentUrl);
+            const isPendingPay = item.status === 'PENDING_PAYMENT';
 
             return (
               <TouchableOpacity style={styles.card} onPress={() => setSelectedDetail(item)}>
@@ -301,6 +391,35 @@ export default function CustomerTreePlantingScreen() {
                   {selectedTree ? `🌱 ${selectedTree.treeName || (selectedTree as any).name}` : 'Nhấp để chọn giống cây'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Growth Duration Warning */}
+              {selectedRental && selectedTree && growthDays > 0 && (
+                isGrowthExceeded ? (
+                  <View style={styles.warningBlock}>
+                    <AlertCircle size={16} color='#dc2626' />
+                    <Text style={styles.warningText}>
+                      ⚠️ Thời gian sinh trưởng ({growthDays} ngày) vượt quá thời hạn thuê còn lại ({remainingDays} ngày). Không thể gửi yêu cầu!
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.successBlock}>
+                    <CheckCircle size={16} color={colors.green[600]} />
+                    <Text style={styles.successText}>
+                      ✅ Giống cây có thể thu hoạch trong {growthDays} ngày. Còn {remainingDays} ngày thuê.
+                    </Text>
+                  </View>
+                )
+              )}
+
+              {/* Estimated Cost */}
+              {selectedTree && estimatedTreeCost > 0 && (
+                <View style={styles.costBlock}>
+                  <CreditCard size={15} color={colors.green[700]} />
+                  <Text style={styles.costText}>
+                    Chi phí phôi giống dự kiến: <Text style={{ fontWeight: '700' }}>{formatCurrency(estimatedTreeCost)}</Text>
+                  </Text>
+                </View>
+              )}
 
               {/* Reason */}
               <Text style={styles.label}>Lý do trồng / thay thế cây *</Text>
@@ -862,5 +981,81 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: 8,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.green[100],
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+  },
+  statCount: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  warningBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#dc2626',
+    flex: 1,
+    lineHeight: 18,
+  },
+  successBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  successText: {
+    fontSize: 12,
+    color: colors.green[700],
+    flex: 1,
+    lineHeight: 18,
+  },
+  costBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: colors.green[200],
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  costText: {
+    fontSize: 13,
+    color: colors.green[800],
+    flex: 1,
   },
 });

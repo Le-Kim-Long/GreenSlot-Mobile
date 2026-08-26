@@ -22,7 +22,7 @@ export type CustomerStackParamList = {
   GardenDetail: { slot: AvailableSlotDTO };
   RentalDetail: { rental: BookingHistory };
   IoTMonitoring: undefined;
-  IoTDetail: { slotId: number };
+  IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
   CareServices: undefined;
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
@@ -51,7 +51,7 @@ export type GardenStaffStackParamList = {
   GardenStaffTabs: undefined;
   TaskDetail: { taskId: number };
   IoTMonitoring: undefined;
-  IoTDetail: { slotId: number };
+  IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
   GardenStaffAlert: undefined;
   IoTOperations: undefined;
 };

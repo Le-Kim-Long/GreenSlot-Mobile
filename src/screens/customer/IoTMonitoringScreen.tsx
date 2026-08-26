@@ -138,7 +138,7 @@ export default function IoTMonitoringScreen() {
                 slotId,
                 slotNumber: r.slotNumber,
                 locationName: r.locationName,
-                treeName: r.treeName,
+                treeName: pillar.treeName || r.treeName,
                 pillarCode: pillar.pillarCode,
                 pillarId: pillar.id,
                 pillarType: pillar.pillarType || 'Trụ Canh Tác',
@@ -305,7 +305,11 @@ export default function IoTMonitoringScreen() {
             <PillarSummaryCard
               key={`${r.slotId}-${r.pillarCode}-${idx}`}
               rental={r}
-              onViewDetail={() => navigation.navigate('IoTDetail', { slotId: r.slotId })}
+              onViewDetail={() => navigation.navigate('IoTDetail', {
+                slotId: r.slotId,
+                pillarId: r.pillarId,
+                pillarCode: r.pillarCode,
+              })}
             />
           ))}
         </View>

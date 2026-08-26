@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Modal,
   FlatList,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -18,28 +20,46 @@ import {
   X,
   Clock,
   RotateCcw,
-  Wrench,
   Sprout,
+  CalendarCheck2,
+  TriangleAlert,
+  Send,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
-import { harvestApi } from '../../api/harvestApi';
+import { taskApi, managerApi } from '../../api/taskApi';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { Button } from '../../components/ui/Button';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerStackProps } from '../../navigation/types';
+import type { ServiceTypeDTO } from '../../types/api';
 import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12, 18, 24];
 
+/** Handles both ISO ("2026-08-26T...") and formatted ("26/8/2026") date strings */
+function parseDateFlexible(raw: string): Date | null {
+  if (!raw) return null;
+  if (raw.includes('/')) {
+    const parts = raw.split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts.map(Number);
+      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m - 1, d);
+    }
+    return null;
+  }
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(isoOrFormatted: string): string {
   if (!isoOrFormatted) return '--';
   if (isoOrFormatted.includes('/')) return isoOrFormatted;
   try {
-    const d = new Date(isoOrFormatted);
-    if (isNaN(d.getTime())) return isoOrFormatted;
+    const d = parseDateFlexible(isoOrFormatted);
+    if (!d) return isoOrFormatted;
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   } catch {
     return isoOrFormatted;
@@ -48,11 +68,8 @@ function formatDate(isoOrFormatted: string): string {
 
 function parseToDate(isoOrFormatted: string): Date {
   if (!isoOrFormatted) return new Date();
-  if (isoOrFormatted.includes('/')) {
-    const [d, m, y] = isoOrFormatted.split('/').map(Number);
-    return new Date(y, m - 1, d);
-  }
-  return new Date(isoOrFormatted);
+  const d = parseDateFlexible(isoOrFormatted);
+  return d ?? new Date();
 }
 
 function addMonthsToDate(date: Date, months: number): Date {
@@ -133,7 +150,50 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   ), [rental.monthlyPrice, rental.totalPrice, rental.startDate, rental.endDate]);
   const extensionCost = pricePerMonth * selectedMonths;
 
-  const [harvestSubmitting, setHarvestSubmitting] = useState(false);
+  // ── Incident report state ────────────────────────────────────────────────
+  const [incidentVisible, setIncidentVisible] = useState(false);
+  const [serviceTypes, setServiceTypes] = useState<ServiceTypeDTO[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [incidentDesc, setIncidentDesc] = useState('');
+  const [loadingTypes, setLoadingTypes] = useState(false);
+  const [submittingIncident, setSubmittingIncident] = useState(false);
+
+  const openIncident = async () => {
+    setIncidentVisible(true);
+    setLoadingTypes(true);
+    try {
+      const types = await managerApi.getServiceTypes();
+      setServiceTypes(types);
+    } catch {
+      setServiceTypes([]);
+    } finally {
+      setLoadingTypes(false);
+    }
+  };
+
+  const handleIncidentSubmit = async () => {
+    if (!selectedTypeId) { Alert.alert('Vui lòng chọn loại sự cố!'); return; }
+    if (!incidentDesc.trim() || incidentDesc.trim().length < 10) {
+      Alert.alert('Mô tả cần ít nhất 10 ký tự.');
+      return;
+    }
+    setSubmittingIncident(true);
+    try {
+      await taskApi.requestService({
+        slotId: (rental.slotId || rental.id) as number,
+        serviceTypeId: selectedTypeId,
+        description: incidentDesc.trim(),
+      });
+      Alert.alert('Đã gửi!', 'Nhân viên sẽ xử lý sự cố trong thời gian sớm nhất.');
+      setIncidentDesc('');
+      setSelectedTypeId(null);
+      setIncidentVisible(false);
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể gửi báo cáo.');
+    } finally {
+      setSubmittingIncident(false);
+    }
+  };
 
   const handleCancelBooking = () => {
     Alert.alert(
@@ -158,34 +218,6 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
     );
   };
 
-  const handleHarvestDecision = async (decision: 'SELF' | 'STAFF') => {
-    Alert.alert(
-      'Xác nhận phương thức thu hoạch',
-      decision === 'SELF'
-        ? 'Bạn sẽ tự đến vườn để trải nghiệm thu hoạch rau của mình?'
-        : 'Bạn muốn nhân viên nhà vườn thu hoạch giúp và đóng gói gửi cho bạn?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xác nhận',
-          onPress: async () => {
-            setHarvestSubmitting(true);
-            try {
-              await bookingApi.recordHarvestDecision(rental.id, decision);
-              Alert.alert('Thành công', 'Đã ghi nhận lựa chọn thu hoạch của bạn!');
-              const history = await bookingApi.getHistory();
-              const updated = history.find(r => r.id === rental.id);
-              if (updated) setRental(updated);
-            } catch (err: any) {
-              Alert.alert('Lỗi', err?.response?.data?.message || 'Ghi nhận thất bại. Vui lòng thử lại.');
-            } finally {
-              setHarvestSubmitting(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const handleExtend = async () => {
     Alert.alert(
@@ -207,11 +239,14 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               if (result.paymentUrl) {
                 const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
                 const callback = 'callback' in settled ? settled.callback : undefined;
-                if (settled.status === 'success' && settled.rental) {
-                  navigation.replace('RentalDetail', { rental: settled.rental });
-                } else {
-                  navigation.navigate('PaymentResult', { status: settled.status, rentalId: rental.id, slotNumber: rental.slotNumber, amount: callback?.amount, txnRef: callback?.txnRef, orderInfo: callback?.orderInfo });
-                }
+                navigation.replace('PaymentResult', {
+                  status: settled.status,
+                  rentalId: rental.id,
+                  slotNumber: rental.slotNumber,
+                  amount: callback?.amount,
+                  txnRef: callback?.txnRef,
+                  orderInfo: callback?.orderInfo
+                });
               }
             } catch (e: unknown) {
               const err = e as { response?: { data?: { message?: string } } };
@@ -244,34 +279,72 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         </View>
 
-        {/* ── Harvest Decision Banner (nếu đang active) ─────────────────── */}
+        {/* ── Quick Actions Row ─────────────────────────── */}
         {isActive && (
-          <View style={[styles.card, styles.harvestCard]}>
-            <View style={styles.harvestHeader}>
-              <Sprout size={20} color={colors.green[700]} />
-              <Text style={styles.sectionTitle}>Phương thức thu hoạch nông sản</Text>
-            </View>
-            <Text style={styles.harvestSubtitle}>
-              Khi rau củ đến thời điểm chín rộ, bạn có thể tự đến vườn trải nghiệm hái rau hoặc nhờ nhân viên thu hoạch gửi về tận nhà.
-            </Text>
+          <View style={[styles.card, { flexDirection: 'row', gap: spacing.sm, padding: spacing.md }]}>
+            <TouchableOpacity
+              style={[styles.btnPlant, { flex: 1, margin: 0 }]}
+              onPress={() => navigation.navigate('CustomerTreePlanting', { rentalId: rental.id } as any)}
+            >
+              <Sprout size={15} color={colors.green[700]} />
+              <Text style={styles.btnPlantText}>Trồng cây mới</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnIncident, { flex: 1, margin: 0 }]}
+              onPress={openIncident}
+            >
+              <TriangleAlert size={15} color="#dc2626" strokeWidth={2} />
+              <Text style={styles.btnIncidentText}>Báo sự cố</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-            <View style={styles.harvestButtonsRow}>
-              <TouchableOpacity
-                style={styles.harvestSelfBtn}
-                onPress={() => handleHarvestDecision('SELF')}
-                disabled={harvestSubmitting}
-              >
-                <Text style={styles.harvestSelfBtnText}>🌿 Tôi tự đến thu hoạch</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.harvestStaffBtn}
-                onPress={() => handleHarvestDecision('STAFF')}
-                disabled={harvestSubmitting}
-              >
-                <Text style={styles.harvestStaffBtnText}>👨‍🌾 Nhờ vườn thu hoạch</Text>
-              </TouchableOpacity>
+        {/* ── Pillar Info Card ──────────────────────────────────────────── */}
+        {rental.pillars && rental.pillars.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.pillarCardHeader}>
+              <Sprout size={18} color={colors.green[700]} />
+              <Text style={styles.sectionTitle}>Chi tiết trụ canh tác</Text>
             </View>
+            {rental.pillars.map((p, idx) => {
+              const treeName = p.treeName;
+              const harvestDate = p.expectedHarvestDate || p.expectedHarvestAt || (treeName ? rental.expectedHarvestAt : undefined);
+              return (
+                <View key={idx} style={[
+                  styles.pillarRow,
+                  idx < rental.pillars!.length - 1 && styles.pillarRowBorder,
+                ]}>
+                  <View style={styles.pillarIconWrap}>
+                    <Leaf size={14} color={colors.green[600]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pillarCode}>Trụ {p.pillarCode}</Text>
+                    {treeName ? (
+                      <Text style={styles.pillarTree}>🌱 {treeName}</Text>
+                    ) : (
+                      <Text style={styles.pillarEmpty}>Chưa chọn giống cây</Text>
+                    )}
+                    {harvestDate && (
+                      <View style={styles.harvestDateRow}>
+                        <CalendarCheck2 size={11} color={colors.gray[400]} />
+                        <Text style={styles.harvestDateText}>
+                          Dự kiến thu hoạch: {formatDate(harvestDate)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={[
+                    styles.pillarSizeBadge,
+                    p.pillarType === 'LARGE' ? styles.pillarSizeLarge :
+                      p.pillarType === 'SMALL' ? styles.pillarSizeSmall : styles.pillarSizeMedium,
+                  ]}>
+                    <Text style={styles.pillarSizeText}>
+                      {p.pillarTypeName ?? p.pillarType ?? 'Vừa'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -287,7 +360,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             </View>
           </View>
 
-          {rental.treeName && (
+          {/* {rental.treeName && (
             <View style={styles.infoRow}>
               <Sprout size={16} color={colors.green[600]} />
               <View style={styles.infoTexts}>
@@ -295,35 +368,26 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                 <Text style={[styles.infoValue, { color: colors.green[700], fontWeight: '700' }]}>
                   {rental.treeName}
                 </Text>
+                {rental.expectedHarvestAt && (
+                  <Text style={{ fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.gray[500], marginTop: 2 }}>
+                    📅 Dự kiến thu hoạch: {formatDate(rental.expectedHarvestAt)}
+                  </Text>
+                )}
               </View>
             </View>
-          )}
+          )} */}
 
-          {rental.pillars && rental.pillars.length > 0 ? (
-            <View style={styles.infoRow}>
-              <Leaf size={16} color={colors.green[600]} />
-              <View style={styles.infoTexts}>
-                <Text style={styles.infoLabel}>Các trụ canh tác</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                  {rental.pillars.map((p, idx) => (
-                    <View key={idx} style={styles.pillarBadgeFull}>
-                      <Text style={styles.pillarBadgeFullText}>
-                        Trụ {p.pillarCode} ({p.capacityHoles || 24} hốc)
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
+          <View style={styles.infoRow}>
+            <Leaf size={16} color={colors.green[600]} />
+            <View style={styles.infoTexts}>
+              <Text style={styles.infoLabel}>Số trụ canh tác</Text>
+              <Text style={styles.infoValue}>
+                {rental.pillars && rental.pillars.length > 0
+                  ? `${rental.pillars.length} trụ`
+                  : rental.pillarCode ?? '--'}
+              </Text>
             </View>
-          ) : (
-            <View style={styles.infoRow}>
-              <Leaf size={16} color={colors.green[600]} />
-              <View style={styles.infoTexts}>
-                <Text style={styles.infoLabel}>Cột vườn</Text>
-                <Text style={styles.infoValue}>{rental.pillarCode ?? '--'}</Text>
-              </View>
-            </View>
-          )}
+          </View>
 
           {/* Date Range */}
           <View style={styles.dateRangeCard}>
@@ -428,16 +492,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         )}
 
-        {rental.harvestNotifiedAt && !rental.harvestDecision && (
-          <View style={[styles.card, styles.extendCard]}>
-            <Text style={styles.sectionTitle}>Cây đã sẵn sàng thu hoạch</Text>
-            <Text style={styles.extendSubtitle}>Bạn muốn tự thu hoạch hay nhờ nhân viên hỗ trợ?</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Button title="Tự thu hoạch" onPress={() => handleHarvestDecision('SELF')} style={{ flex: 1 }} />
-              <Button title="Nhờ nhân viên" onPress={() => handleHarvestDecision('STAFF')} variant="outline" style={{ flex: 1 }} />
-            </View>
-          </View>
-        )}
+
 
         {/* Padding bottom */}
         <View style={{ height: 40 }} />
@@ -450,6 +505,74 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
         onSelect={setSelectedMonths}
         onClose={() => setPickerVisible(false)}
       />
+
+      {/* Incident Report Modal */}
+      <Modal visible={incidentVisible} transparent animationType="slide" onRequestClose={() => setIncidentVisible(false)}>
+        <View style={incStyles.overlay}>
+          <View style={incStyles.sheet}>
+            <View style={incStyles.header}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TriangleAlert size={18} color="#ef4444" />
+                <Text style={incStyles.title}>Báo cáo sự cố</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIncidentVisible(false)} style={incStyles.closeBtn}>
+                <X size={18} color={colors.gray[600]} />
+              </TouchableOpacity>
+            </View>
+            <View style={incStyles.rentalTag}>
+              <Text style={incStyles.rentalTagText}>Ô {rental.slotNumber} · {rental.locationName}</Text>
+            </View>
+            <ScrollView contentContainerStyle={incStyles.body} showsVerticalScrollIndicator={false}>
+              <Text style={incStyles.label}>Loại sự cố <Text style={{ color: '#ef4444' }}>*</Text></Text>
+              {loadingTypes
+                ? <ActivityIndicator size="small" color={colors.green[600]} style={{ marginVertical: 12 }} />
+                : <View style={incStyles.typeGrid}>
+                  {serviceTypes.length === 0
+                    ? <Text style={incStyles.emptyTypes}>Không tải được danh sách. Mô tả sự cố bên dưới.</Text>
+                    : serviceTypes.map(st => (
+                      <TouchableOpacity
+                        key={st.id}
+                        style={[incStyles.chip, selectedTypeId === st.id && incStyles.chipActive]}
+                        onPress={() => setSelectedTypeId(st.id ?? null)}
+                      >
+                        <Text style={[incStyles.chipText, selectedTypeId === st.id && incStyles.chipTextActive]}>
+                          {st.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  }
+                </View>
+              }
+              <Text style={incStyles.label}>Mô tả chi tiết <Text style={{ color: '#ef4444' }}>*</Text></Text>
+              <TextInput
+                style={incStyles.textarea}
+                value={incidentDesc}
+                onChangeText={setIncidentDesc}
+                multiline
+                numberOfLines={4}
+                placeholder="Mô tả sự cố (hệ thống tưới, giống cây, thiết bị, v.v.)..."
+                placeholderTextColor={colors.gray[400]}
+                textAlignVertical="top"
+              />
+            </ScrollView>
+            <View style={incStyles.footer}>
+              <TouchableOpacity style={incStyles.cancelBtn} onPress={() => setIncidentVisible(false)}>
+                <Text style={incStyles.cancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[incStyles.submitBtn, (submittingIncident || !selectedTypeId) && incStyles.submitDisabled]}
+                onPress={handleIncidentSubmit}
+                disabled={submittingIncident || !selectedTypeId}
+              >
+                {submittingIncident
+                  ? <ActivityIndicator size="small" color={colors.white} />
+                  : <Send size={15} color={colors.white} />}
+                <Text style={incStyles.submitText}>{submittingIncident ? 'Đang gửi...' : 'Gửi báo cáo'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -606,52 +729,75 @@ const styles = StyleSheet.create({
   serviceOptionPrice: { ...typography.label, color: colors.green[700] },
   serviceOptionPriceSelected: { fontWeight: '700' },
 
-  // Harvest Card
-  harvestCard: {
-    backgroundColor: '#f0fdf4',
-    borderColor: colors.green[300],
-    borderWidth: 1.5,
-  },
-  harvestHeader: {
+  // Pillar detail card
+  pillarCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  harvestSubtitle: {
-    ...typography.bodySmall,
-    color: colors.gray[600],
-    marginBottom: spacing.md,
-  },
-  harvestButtonsRow: {
-    flexDirection: 'column',
+  pillarRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  harvestSelfBtn: {
-    backgroundColor: colors.green[600],
-    paddingVertical: 12,
-    borderRadius: radius.lg,
+  pillarRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+  },
+  pillarIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.green[50],
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
-  harvestSelfBtnText: {
-    color: colors.white,
+  pillarCode: {
+    fontSize: 13,
+    fontFamily: 'Inter_700Bold',
+    color: colors.gray[900],
+  },
+  pillarTree: {
+    fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-  },
-  harvestStaffBtn: {
-    backgroundColor: colors.white,
-    paddingVertical: 12,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.green[600],
-  },
-  harvestStaffBtnText: {
     color: colors.green[700],
+    marginTop: 2,
+  },
+  pillarEmpty: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[400],
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  harvestDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+  harvestDateText: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[500],
+  },
+  pillarSizeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  pillarSizeLarge: { backgroundColor: '#fef3c7' },
+  pillarSizeMedium: { backgroundColor: colors.green[50] },
+  pillarSizeSmall: { backgroundColor: '#f0f9ff' },
+  pillarSizeText: {
+    fontSize: 10,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+    color: colors.gray[700],
   },
 
   pillarBadgeFull: {
@@ -681,6 +827,39 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     fontFamily: 'Inter_600SemiBold',
   },
+
+  // Active action buttons
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  btnPlant: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.green[50],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.green[300],
+    paddingVertical: 12,
+  },
+  btnPlantText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.green[700] },
+  btnIncident: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingVertical: 12,
+  },
+  btnIncidentText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#dc2626' },
 });
 
 // ─── Duration Picker Styles ───────────────────────────────────────────────────
@@ -723,4 +902,91 @@ const pickerStyles = StyleSheet.create({
   optionNumSelected: { color: colors.white },
   optionLabel: { ...typography.caption, color: colors.green[500] },
   optionLabelSelected: { color: 'rgba(255,255,255,0.8)' },
+});
+
+// ─── Incident Modal Styles ────────────────────────────────────────────────────
+const incStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '88%',
+    overflow: 'hidden',
+    paddingBottom: 32,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+  },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.gray[900] },
+  closeBtn: { padding: 6, backgroundColor: colors.gray[100], borderRadius: radius.full },
+  rentalTag: {
+    backgroundColor: colors.green[50],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.green[100],
+  },
+  rentalTagText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.green[800] },
+  body: { padding: spacing.lg, gap: spacing.md },
+  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.gray[700] },
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: colors.gray[200],
+    backgroundColor: colors.gray[50],
+  },
+  chipActive: { borderColor: '#ef4444', backgroundColor: '#fef2f2' },
+  chipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.gray[600] },
+  chipTextActive: { color: '#dc2626', fontFamily: 'Inter_700Bold' },
+  emptyTypes: { fontSize: 12, color: colors.gray[400], fontFamily: 'Inter_400Regular' },
+  textarea: {
+    borderWidth: 1.5,
+    borderColor: colors.gray[200],
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[800],
+    minHeight: 100,
+    backgroundColor: colors.gray[50],
+  },
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    backgroundColor: colors.gray[100],
+    alignItems: 'center',
+  },
+  cancelText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.gray[700] },
+  submitBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    backgroundColor: '#dc2626',
+  },
+  submitDisabled: { opacity: 0.55 },
+  submitText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.white },
 });

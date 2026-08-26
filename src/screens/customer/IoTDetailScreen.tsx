@@ -280,57 +280,32 @@ function SensorGaugeCard({
 export default function IoTDetailScreen() {
   const route = useRoute<RouteProp<CustomerStackParamList, 'IoTDetail'>>();
   const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
-  const { slotId } = route.params;
+  const { slotId, pillarId, pillarCode: routePillarCode } = route.params;
 
   const [rental, setRental] = useState<any>(null);
+  const resolvedPillarCodeRef = useRef<string | null>(null);
   const [readings, setReadings] = useState<SensorReadingResponseDTO[]>([]);
   const [historyData, setHistoryData] = useState<Record<string, number[]>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load rental detail from history
-  const loadRentalInfo = useCallback(async () => {
+  // Load readings and history - use codeOverride or resolvedPillarCodeRef.current for specific pillar data
+  const loadReadings = useCallback(async (codeOverride?: string) => {
     try {
-      const history = await bookingApi.getHistory();
-      const active = history.find(r => (r.slotId || r.id) === slotId);
-      if (active) {
-        const cleanPillars = active.pillars?.filter((p: any) => p.pillarCode !== 'arduino-greenhouse-01') || [];
-        const totalHoles = cleanPillars.reduce((sum: number, p: any) => sum + (p.capacityHoles || 0), 0) || 24;
-        
-        let displayPillarCode = active.pillarCode || '';
-        if (displayPillarCode) {
-          displayPillarCode = displayPillarCode
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter((s: string) => s && s !== 'arduino-greenhouse-01')
-            .join(', ');
-        }
-        if (!displayPillarCode && cleanPillars.length > 0) {
-          displayPillarCode = cleanPillars.map((p: any) => p.pillarCode).join(', ');
-        }
-
-        setRental({
-          slotId,
-          slotNumber: active.slotNumber,
-          locationName: active.locationName,
-          treeName: active.treeName,
-          pillarCode: displayPillarCode || 'ESP32',
-          capacityHoles: totalHoles,
-        });
-      }
-    } catch (err) {
-      console.log('Error loading rental details', err);
-    }
-  }, [slotId]);
-
-  // Load readings and history
-  const loadReadings = useCallback(async () => {
-    try {
-      const [latest, hist] = await Promise.allSettled([
-        iotApi.getLatestBySlot(slotId),
-        iotApi.getHistoryBySlot(slotId, HISTORY_LIMIT),
-      ]);
+      const codeToUse = codeOverride || routePillarCode || resolvedPillarCodeRef.current;
+      const [latest, hist] = await Promise.allSettled(
+        codeToUse
+          ? [
+              // Fetch by specific pillar code (deviceId) for accurate data (matching FE)
+              iotApi.getLatest(codeToUse),
+              iotApi.getHistory(codeToUse, HISTORY_LIMIT),
+            ]
+          : [
+              iotApi.getLatestBySlot(slotId),
+              iotApi.getHistoryBySlot(slotId, HISTORY_LIMIT),
+            ]
+      );
 
       const latestData = latest.status === 'fulfilled' ? (latest.value || []) : [];
       const histData = hist.status === 'fulfilled' ? (hist.value || []) : [];
@@ -350,13 +325,59 @@ export default function IoTDetailScreen() {
     } catch {
       // silent
     }
-  }, [slotId]);
+  }, [slotId, routePillarCode]);
+
+  const loadRentalInfo = useCallback(async () => {
+    try {
+      const history = await bookingApi.getHistory();
+      const active = history.find(r => (r.slotId || r.id) == slotId && r.status === 'ACTIVE') || history.find(r => (r.slotId || r.id) == slotId); // eslint-disable-line eqeqeq
+      if (active) {
+        const cleanPillars = active.pillars?.filter((p: any) => p.pillarCode !== 'arduino-greenhouse-01') || [];
+
+        // If a specific pillar was selected, show only that pillar's info
+        // Support fallback to pillarCode match in case pillarId has type/value mismatch
+        const targetPillar = cleanPillars.find((p: any) => 
+          (pillarId && p.id == pillarId) || 
+          (routePillarCode && p.pillarCode?.trim().toLowerCase() === routePillarCode.trim().toLowerCase())
+        );
+
+        const displayPillarCode = targetPillar?.pillarCode ||
+          routePillarCode ||
+          (cleanPillars.length > 0 ? cleanPillars.map((p: any) => p.pillarCode).join(', ') : 'ESP32');
+
+        const displayHoles = targetPillar?.capacityHoles ||
+          (cleanPillars.reduce((sum: number, p: any) => sum + (p.capacityHoles || 0), 0) || 24);
+
+        const displayTreeName = targetPillar?.treeName || active.treeName;
+
+        setRental({
+          slotId,
+          slotNumber: active.slotNumber,
+          locationName: active.locationName,
+          treeName: displayTreeName,
+          pillarCode: displayPillarCode,
+          capacityHoles: displayHoles,
+        });
+
+        // Set the actual pillar code to use for sensor queries
+        const actualCode = targetPillar?.pillarCode || routePillarCode || (cleanPillars.length === 1 ? cleanPillars[0].pillarCode : null);
+        if (actualCode) {
+          resolvedPillarCodeRef.current = actualCode;
+          loadReadings(actualCode);
+        } else {
+          loadReadings();
+        }
+      }
+    } catch (err) {
+      console.log('Error loading rental details', err);
+    }
+  }, [slotId, pillarId, routePillarCode, loadReadings]);
 
   const initData = useCallback(async () => {
     setLoading(true);
-    await Promise.all([loadRentalInfo(), loadReadings()]);
+    await loadRentalInfo();
     setLoading(false);
-  }, [loadRentalInfo, loadReadings]);
+  }, [loadRentalInfo]);
 
   useEffect(() => {
     initData();
@@ -364,13 +385,13 @@ export default function IoTDetailScreen() {
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(loadReadings, POLL_INTERVAL);
+    intervalRef.current = setInterval(() => loadReadings(), POLL_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [loadReadings]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadRentalInfo(), loadReadings()]);
+    await loadRentalInfo();
     setRefreshing(false);
   };
 

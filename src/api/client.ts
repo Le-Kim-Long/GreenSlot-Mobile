@@ -3,9 +3,9 @@ import * as SecureStore from 'expo-secure-store';
 
 const TOKEN_KEY = 'greenslot_token';
 
-function resolveApiBaseUrl(): string {
+export function resolveApiBaseUrl(): string {
   const raw = process.env.EXPO_PUBLIC_API_URL;
-  const trimmed = raw.replace(/\/$/, '');
+  const trimmed = raw?.replace(/\/$/, '') || '';
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 }
 

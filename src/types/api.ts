@@ -79,6 +79,9 @@ export interface PillarDetail {
   slotNumber?: string;
   isRented?: boolean;
   isAvailable?: boolean;
+  treeName?: string;
+  expectedHarvestDate?: string;
+  expectedHarvestAt?: string;
 }
 
 export type PillarInfo = PillarDetail;
@@ -351,6 +354,9 @@ export interface TreePlantingRequestCreateDTO {
   targetPillarId?: number;
   reason: string;
   notes?: string;
+  isMobile?: boolean;
+  mobileRedirectUrl?: string;
+  redirectUrl?: string;
 }
 
 export interface TreePlantingRequestDTO {
@@ -558,6 +564,8 @@ export interface BookingHistory {
   transactions: PaymentTransactionInfo[];
   harvestNotifiedAt?: string;
   harvestDecision?: string;
+  plantedAt?: string;
+  expectedHarvestAt?: string;
 }
 
 export type ServiceType = ServiceTypeDTO;
