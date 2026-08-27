@@ -210,10 +210,10 @@ function ItemizedBreakdown({ txn }: { txn: PaymentItem }) {
           <Text style={bStyles.footerLabel}>Tạm tính chi phí:</Text>
           <Text style={bStyles.footerMono}>{total.toLocaleString('vi-VN')}đ</Text>
         </View>
-        <View style={bStyles.footerRow}>
+        {/* <View style={bStyles.footerRow}>
           <Text style={bStyles.footerLabel}>Thuế GTGT / Phí nền tảng:</Text>
           <Text style={bStyles.footerGray}>0đ (Đã bao gồm)</Text>
-        </View>
+        </View> */}
         <View style={[bStyles.footerRow, bStyles.footerTotal]}>
           <Text style={bStyles.footerTotalLabel}>Tổng thực tế (VNPay):</Text>
           <Text style={bStyles.footerTotalValue}>{total.toLocaleString('vi-VN')} VNĐ</Text>
@@ -331,8 +331,8 @@ export default function PaymentHistoryScreen() {
               filter === 'EXTEND'
                 ? 'Bạn chưa có giao dịch gia hạn hợp đồng nào'
                 : filter === 'PLANT'
-                ? 'Bạn chưa có giao dịch mua giống rau nào'
-                : 'Lịch sử thanh toán sẽ hiển thị tại đây'
+                  ? 'Bạn chưa có giao dịch mua giống rau nào'
+                  : 'Lịch sử thanh toán sẽ hiển thị tại đây'
             }
           />
         }
@@ -370,8 +370,8 @@ export default function PaymentHistoryScreen() {
                       {isExtend
                         ? `Gia hạn${item.extendedMonths ? ` (+${item.extendedMonths}T)` : ''}`
                         : isPlant
-                        ? 'Mua phôi giống'
-                        : 'Thuê mới'}
+                          ? 'Mua phôi giống'
+                          : 'Thuê mới'}
                     </Text>
                     <Text style={styles.ref} numberOfLines={1}>
                       {item.vnpTxnRef || `#${item.id}`}
@@ -462,8 +462,8 @@ export default function PaymentHistoryScreen() {
                       selectedTxn.status === 'SUCCESS' || selectedTxn.status === 'PAID'
                         ? { color: colors.green[700] }
                         : selectedTxn.status === 'PENDING'
-                        ? { color: '#d97706' }
-                        : { color: '#dc2626' }
+                          ? { color: '#d97706' }
+                          : { color: '#dc2626' }
                     ]}>
                       {statusToBadge(selectedTxn.status).label}
                     </Text>
@@ -480,8 +480,8 @@ export default function PaymentHistoryScreen() {
                       {selectedTxn.kind === 'EXTEND'
                         ? `Gia hạn hợp đồng (${selectedTxn.extendedMonths || 1} tháng)`
                         : selectedTxn.kind === 'PLANT'
-                        ? 'Mua phôi giống rau canh tác mới'
-                        : 'Đăng ký thuê ô vườn mới'}
+                          ? 'Mua phôi giống rau canh tác mới'
+                          : 'Đăng ký thuê ô vườn mới'}
                     </Text>
                   </View>
 
@@ -570,8 +570,8 @@ export default function PaymentHistoryScreen() {
                     <Text style={styles.detailLabel}>Thời hạn hợp đồng:</Text>
                     <Text style={styles.detailValue}>
                       {selectedTxn.startDate && selectedTxn.endDate &&
-                       !isNaN(new Date(selectedTxn.startDate).getTime()) &&
-                       !isNaN(new Date(selectedTxn.endDate).getTime())
+                        !isNaN(new Date(selectedTxn.startDate).getTime()) &&
+                        !isNaN(new Date(selectedTxn.endDate).getTime())
                         ? `${new Date(selectedTxn.startDate).toLocaleDateString('vi-VN')} → ${new Date(selectedTxn.endDate).toLocaleDateString('vi-VN')}`
                         : `Theo hợp đồng thuê HĐ #${selectedTxn.rentalId}`}
                     </Text>

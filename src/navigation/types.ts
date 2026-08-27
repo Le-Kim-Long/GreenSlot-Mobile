@@ -32,6 +32,7 @@ export type CustomerStackParamList = {
   HarvestHistory?: undefined;
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
+    type?: 'rental' | 'tree';
     rentalId?: number;
     slotNumber?: string;
     amount?: string;

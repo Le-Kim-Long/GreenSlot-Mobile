@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import {
   Cpu,
@@ -113,6 +114,8 @@ export default function IoTMonitoringScreen() {
   const [rentals, setRentals] = useState<RentedSlotOption[]>([]);
   const [filterSlotId, setFilterSlotId] = useState<string>('all');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownLayout, setDropdownLayout] = useState<{ x: number; y: number; width: number } | null>(null);
+  const triggerRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -231,8 +234,18 @@ export default function IoTMonitoringScreen() {
 
         {/* Dropdown Trigger Button */}
         <TouchableOpacity
+          ref={triggerRef}
           style={styles.dropdownTrigger}
-          onPress={() => setDropdownOpen(!dropdownOpen)}
+          onPress={() => {
+            if (!dropdownOpen) {
+              triggerRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+                setDropdownLayout({ x, y: y + height + 4, width });
+                setDropdownOpen(true);
+              });
+            } else {
+              setDropdownOpen(false);
+            }
+          }}
           activeOpacity={0.8}
         >
           <Text style={styles.dropdownTriggerText} numberOfLines={1}>
@@ -242,40 +255,64 @@ export default function IoTMonitoringScreen() {
           <ChevronDown size={16} color='#475569' style={{ marginLeft: 8 }} />
         </TouchableOpacity>
 
-        {/* Simulated Dropdown Menu - absolute overlay */}
-        {dropdownOpen && (
-          <View style={styles.dropdownMenu}>
-            <TouchableOpacity
-              style={[styles.dropdownItem, filterSlotId === 'all' && styles.dropdownItemActive]}
-              onPress={() => {
-                setFilterSlotId('all');
-                setDropdownOpen(false);
-              }}
-            >
-              <Text style={[styles.dropdownItemText, filterSlotId === 'all' && styles.dropdownItemTextActive]}>
-                🌐 Tất cả các trụ (Bảng tổng hợp)
-              </Text>
-            </TouchableOpacity>
-            {rentals.map((item, idx) => {
-              const itemKey = `${item.slotId}-${item.pillarCode}`;
-              const isSel = filterSlotId === itemKey;
-              return (
-                <TouchableOpacity
-                  key={`${itemKey}-${idx}`}
-                  style={[styles.dropdownItem, isSel && styles.dropdownItemActive]}
-                  onPress={() => {
-                    setFilterSlotId(itemKey);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextActive]}>
-                    🌱 Trụ {item.pillarCode} - Ô {item.slotNumber} ({item.capacityHoles || 24} hốc)
-                  </Text>
+        {/* Dropdown via Modal — renders outside ScrollView so scroll works correctly */}
+        <Modal
+          visible={dropdownOpen}
+          transparent
+          animationType='none'
+          onRequestClose={() => setDropdownOpen(false)}
+        >
+          {/* Backdrop: tap outside to close */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setDropdownOpen(false)}
+          >
+            {dropdownLayout && (
+              <View
+                style={[
+                  styles.dropdownMenu,
+                  { position: 'absolute', top: dropdownLayout.y, left: dropdownLayout.x, width: dropdownLayout.width },
+                ]}
+              >
+                {/* Stop propagation so tapping inside doesn't close the modal */}
+                <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+                  {/* "All" option */}
+                  <TouchableOpacity
+                    style={[styles.dropdownItem, filterSlotId === 'all' && styles.dropdownItemActive]}
+                    onPress={() => { setFilterSlotId('all'); setDropdownOpen(false); }}
+                  >
+                    <Text style={[styles.dropdownItemText, filterSlotId === 'all' && styles.dropdownItemTextActive]}>
+                      🌐 Tất cả các trụ (Bảng tổng hợp)
+                    </Text>
+                  </TouchableOpacity>
+                  {/* Scrollable list — max 6 items */}
+                  <ScrollView
+                    style={{ maxHeight: 6 * 48 }}
+                    keyboardShouldPersistTaps='handled'
+                    showsVerticalScrollIndicator={rentals.length > 6}
+                  >
+                    {rentals.map((item, idx) => {
+                      const itemKey = `${item.slotId}-${item.pillarCode}`;
+                      const isSel = filterSlotId === itemKey;
+                      return (
+                        <TouchableOpacity
+                          key={`${itemKey}-${idx}`}
+                          style={[styles.dropdownItem, isSel && styles.dropdownItemActive]}
+                          onPress={() => { setFilterSlotId(itemKey); setDropdownOpen(false); }}
+                        >
+                          <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextActive]}>
+                            🌱 Trụ {item.pillarCode} - Ô {item.slotNumber} ({item.capacityHoles || 24} hốc)
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+              </View>
+            )}
+          </TouchableOpacity>
+        </Modal>
       </View>
 
       <ScrollView
@@ -390,22 +427,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dropdownMenu: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    marginTop: 4,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 14,
-    elevation: 10,
-    zIndex: 200,
+    elevation: 12,
+    overflow: 'hidden',
   },
   dropdownItem: {
     paddingHorizontal: 14,

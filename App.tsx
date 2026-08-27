@@ -63,7 +63,6 @@ export default function App() {
         Customer: {
           screens: {
             CustomerTabs: '',
-            PaymentResult: 'payment-result',
           },
         },
       },

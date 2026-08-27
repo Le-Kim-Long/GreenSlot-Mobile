@@ -107,29 +107,45 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   };
 
-  const getTreePriceForPillarCapacity = (tree: TreeDTO | null, holes: number = 24) => {
+  /**
+   * Mirror backend's Tree.getEffectivePriceForPillar():
+   * Checks pillarType first (LARGE / MEDIUM) and also holes count.
+   */
+  const getTreePriceForPillar = (tree: TreeDTO | null, pillar?: PillarDetail | null) => {
     if (!tree) return 0;
     const price = tree.price || 0;
     const priceLarge = (tree as any).priceLarge;
     const priceMedium = (tree as any).priceMedium;
     const priceSmall = (tree as any).priceSmall;
-    if (holes >= 48) return Number(priceLarge != null ? priceLarge : (price * 2.0));
-    if (holes >= 36) return Number(priceMedium != null ? priceMedium : (price * 1.5));
-    return Number(priceSmall != null ? priceSmall : price);
+
+    const effectivePriceSmall = priceSmall != null && Number(priceSmall) > 0 ? Number(priceSmall) : price;
+    const effectivePriceMedium = priceMedium != null && Number(priceMedium) > 0 ? Number(priceMedium) : effectivePriceSmall * 1.5;
+    const effectivePriceLarge = priceLarge != null && Number(priceLarge) > 0 ? Number(priceLarge) : effectivePriceSmall * 2.0;
+
+    if (!pillar) return effectivePriceSmall;
+
+    const holes = pillar.capacityHoles ?? 24;
+    const type = (pillar.pillarType ?? '').toUpperCase();
+
+    // Match backend: if type is LARGE or holes >= 48 → priceLarge
+    if (type === 'LARGE' || holes >= 48) return effectivePriceLarge;
+    // If type is MEDIUM or holes >= 36 → priceMedium
+    if (type === 'MEDIUM' || holes >= 36) return effectivePriceMedium;
+    return effectivePriceSmall;
   };
 
   const getEstimatedCost = () => {
     if (!selectedTree) return 0;
     if (selectedPillar) {
-      return getTreePriceForPillarCapacity(selectedTree, selectedPillar.capacityHoles || 24);
+      return getTreePriceForPillar(selectedTree, selectedPillar);
     } else if (selectedRental?.pillars && selectedRental.pillars.length > 0) {
       return selectedRental.pillars.reduce(
-        (acc, p) => acc + getTreePriceForPillarCapacity(selectedTree, p.capacityHoles || 24),
+        (acc, p) => acc + getTreePriceForPillar(selectedTree, p),
         0
       );
     } else {
       const pillarCount = selectedRental?.pillarCodes?.length || selectedRental?.pillars?.length || 1;
-      return getTreePriceForPillarCapacity(selectedTree, 24) * pillarCount;
+      return getTreePriceForPillar(selectedTree, null) * pillarCount;
     }
   };
 
@@ -187,6 +203,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                 fetchData();
                 navigation.replace('PaymentResult', {
                   status: settled.status,
+                  type: 'tree',
                   rentalId: selectedRental.id,
                   slotNumber: selectedRental.slotNumber,
                   amount: settled.callback?.amount,

@@ -76,10 +76,20 @@ export default function PaymentResultScreen({
   const params = route.params ?? {};
   const isSuccess = params.status === 'success' || (params as any).responseCode === '00' || (params as any).vnp_ResponseCode === '00';
   const status: PaymentStatus = isSuccess ? 'success' : (params.status === 'failed' ? 'failed' : 'pending');
-  const { slotNumber, amount, txnRef, orderInfo } = params;
+  const { slotNumber, amount, txnRef, orderInfo, type } = params;
+  const isTreePayment = type === 'tree';
 
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const Icon = config.icon;
+
+  // Override content for tree planting payments
+  const displayTitle = isTreePayment && isSuccess ? '🌱 Thanh toán phôi giống thành công!' : config.title;
+  const displaySubtitle = isTreePayment && isSuccess
+    ? 'Thanh toán mua phôi giống thành công. Yêu cầu trồng cây của bạn đã được ghi nhận và đang chờ nhà vườn phê duyệt.'
+    : isTreePayment && status === 'failed'
+      ? 'Thanh toán phôi giống không thành công. Vui lòng thử lại.'
+      : config.subtitle;
+  const displayButtonLabel = isTreePayment ? 'Xem yêu cầu trồng cây' : config.buttonLabel;
 
   const [countdown, setCountdown] = useState(AUTO_NAVIGATE_DELAY / 1000);
 
@@ -131,10 +141,34 @@ export default function PaymentResultScreen({
   }, []);
 
   const goToRentals = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'CustomerTabs' }],
-    });
+    if (isTreePayment) {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'CustomerTabs',
+            state: {
+              routes: [{ name: 'Rentals' }],
+              index: 0,
+            },
+          },
+          { name: 'CustomerTreePlanting' },
+        ],
+      });
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'CustomerTabs',
+            state: {
+              routes: [{ name: 'Rentals' }],
+              index: 0,
+            },
+          },
+        ],
+      });
+    }
   };
 
   const formattedAmount = formatAmount(amount);
@@ -162,8 +196,8 @@ export default function PaymentResultScreen({
             { opacity: opacityAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
-          <Text style={styles.title}>{config.title}</Text>
-          <Text style={styles.subtitle}>{config.subtitle}</Text>
+          <Text style={styles.title}>{displayTitle}</Text>
+          <Text style={styles.subtitle}>{displaySubtitle}</Text>
 
           {(slotNumber || formattedAmount || txnRef) && (
             <View style={styles.detailCard}>
@@ -189,7 +223,7 @@ export default function PaymentResultScreen({
             onPress={goToRentals}
             activeOpacity={0.85}
           >
-            <Text style={styles.buttonText}>{config.buttonLabel}</Text>
+            <Text style={styles.buttonText}>{displayButtonLabel}</Text>
             <ChevronRight size={20} color="#ffffff" />
           </TouchableOpacity>
         </Animated.View>
