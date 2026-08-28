@@ -23,7 +23,7 @@ export type CustomerStackParamList = {
   RentalDetail: { rental: BookingHistory };
   IoTMonitoring: undefined;
   IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
-  CareServices: undefined;
+  Camera: undefined;
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
   Notifications: undefined;

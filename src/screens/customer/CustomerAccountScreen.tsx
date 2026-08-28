@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   User as UserIcon,
   Wifi,
-  Wrench,
+  Camera,
   CreditCard,
   History,
   LayoutDashboard,
@@ -54,7 +54,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
     { icon: Wifi, label: 'Giám sát IoT', screen: 'IoTMonitoring' as const },
     { icon: Sprout, label: 'Yêu cầu trồng cây', screen: 'CustomerTreePlanting' as const },
     { icon: History, label: 'Lịch sử thu hoạch', screen: 'CustomerHarvestHistory' as const },
-    { icon: Wrench, label: 'Dịch vụ chăm sóc', screen: 'CareServices' as const },
+    { icon: Camera, label: 'Camera giám sát', screen: 'Camera' as const },
     { icon: CreditCard, label: 'Lịch sử thanh toán', screen: 'PaymentHistory' as const },
   ];
 
