@@ -88,7 +88,7 @@ export default function AccountScreen({ navigation }: CustomerTabProps<'Account'
           <TouchableOpacity
             key={i}
             style={styles.menuItem}
-            onPress={() => navigation.navigate(item.screen)}
+            onPress={() => (navigation.navigate as any)(item.screen)}
           >
             <View style={styles.menuIcon}>
               <item.icon size={20} color={colors.green[600]} />
