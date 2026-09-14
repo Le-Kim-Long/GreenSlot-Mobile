@@ -14,7 +14,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<string | true>;
   logout: () => Promise<void>;
   register: (username: string, name: string, email: string, password: string, phone?: string, address?: string) => Promise<string | true>;
-  loginWithGoogle: (idToken: string) => Promise<boolean>;
+  loginWithGoogle: (idToken: string, mode?: 'login' | 'register') => Promise<string | true>;
   loginWithJwtData: (data: import('../types/api').JwtResponse) => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -82,17 +82,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithGoogle = async (idToken: string): Promise<boolean> => {
+  const loginWithGoogle = async (idToken: string, mode: 'login' | 'register' = 'login'): Promise<string | true> => {
     try {
-      const data = await authApi.googleLogin({ idToken });
+      const data = await authApi.googleLogin({ idToken, mode });
       if (data?.token) {
         await loginWithJwtData(data);
         return true;
       }
-      return false;
-    } catch (err) {
+      return 'Không nhận được mã xác thực từ máy chủ';
+    } catch (err: unknown) {
       console.warn('Google login request failed:', err);
-      return false;
+      return getApiErrorMessage(err, 'Đăng nhập Google không thành công.');
     }
   };
 

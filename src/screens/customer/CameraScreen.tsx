@@ -29,9 +29,7 @@ export default function CameraScreen() {
   const [snapshotUri, setSnapshotUri] = useState<string | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [countdown, setCountdown] = useState(30);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadCameras = useCallback(async () => {
     try {
@@ -55,45 +53,40 @@ export default function CameraScreen() {
     loadCameras();
   };
 
-  const refreshSnapshot = useCallback((captureUrl: string) => {
-    setSnapshotUri(null);
-    setSnapshotLoading(true);
-    setTimeout(() => {
-      setSnapshotUri(`${captureUrl}?t=${Date.now()}`);
-      setSnapshotLoading(false);
-    }, 300);
+  const refreshSnapshot = useCallback((captureUrl: string, initial = false) => {
+    if (initial) {
+      setSnapshotLoading(true);
+    }
+    const separator = captureUrl.includes('?') ? '&' : '?';
+    setSnapshotUri(`${captureUrl}${separator}t=${Date.now()}`);
+    if (initial) {
+      setTimeout(() => setSnapshotLoading(false), 250);
+    }
   }, []);
 
   const startAutoRefresh = useCallback((captureUrl: string) => {
-    // Clear any existing timers
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
-
-    setCountdown(30);
-
-    // Countdown tick every 1s
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => (prev <= 1 ? 30 : prev - 1));
-    }, 1000);
-
-    // Refresh snapshot every 30s
+    // Tự động làm mới khung hình mỗi 2 giây
     intervalRef.current = setInterval(() => {
-      refreshSnapshot(captureUrl);
-      setCountdown(30);
-    }, 30000);
+      refreshSnapshot(captureUrl, false);
+    }, 2000);
   }, [refreshSnapshot]);
 
   const stopAutoRefresh = useCallback(() => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   }, []);
 
   const handleViewCamera = (camera: CameraDTO) => {
     setSelectedCamera(camera);
     setModalVisible(true);
     if (camera.capture_url) {
-      refreshSnapshot(camera.capture_url);
+      refreshSnapshot(camera.capture_url, true);
       startAutoRefresh(camera.capture_url);
+    } else if (camera.stream_url) {
+      setSnapshotUri(camera.stream_url);
     } else {
       setSnapshotUri(null);
     }
@@ -104,14 +97,6 @@ export default function CameraScreen() {
     setModalVisible(false);
     setSelectedCamera(null);
     setSnapshotUri(null);
-    setCountdown(30);
-  };
-
-  const handleRefreshSnapshot = () => {
-    if (!selectedCamera?.capture_url) return;
-    refreshSnapshot(selectedCamera.capture_url);
-    // Restart the 10s auto-refresh cycle from now
-    startAutoRefresh(selectedCamera.capture_url);
   };
 
   // Cleanup on unmount
@@ -242,37 +227,32 @@ export default function CameraScreen() {
               {snapshotLoading ? (
                 <View style={styles.snapshotPlaceholder}>
                   <ActivityIndicator size="large" color={colors.green[600]} />
-                  <Text style={styles.snapshotLoadingText}>Đang tải hình ảnh...</Text>
+                  <Text style={styles.snapshotLoadingText}>Đang tải luồng hình ảnh...</Text>
                 </View>
               ) : snapshotUri ? (
-                <Image
-                  source={{ uri: snapshotUri }}
-                  style={styles.snapshotImage}
-                  resizeMode="contain"
-                  onError={() => setSnapshotUri(null)}
-                />
+                <View style={styles.snapshotContainer}>
+                  <Image
+                    source={{ uri: snapshotUri }}
+                    style={styles.snapshotImage}
+                    resizeMode="contain"
+                    onError={() => setSnapshotUri(null)}
+                  />
+                  <View style={styles.modalLiveBadge}>
+                    <View style={styles.liveDot} />
+                    <Text style={styles.liveText}>LIVE</Text>
+                  </View>
+                </View>
               ) : (
                 <View style={styles.snapshotPlaceholder}>
                   <Video size={56} color={colors.green[300]} />
                   <Text style={styles.snapshotPlaceholderText}>
-                    {selectedCamera?.stream_url
-                      ? 'Nhấn làm mới để xem hình ảnh'
+                    {selectedCamera?.capture_url
+                      ? 'Đang kết nối luồng hình ảnh...'
                       : 'Không có hình ảnh'}
                   </Text>
                 </View>
               )}
             </View>
-
-            {/* Refresh snapshot button with countdown */}
-            {selectedCamera?.capture_url && (
-              <TouchableOpacity style={styles.refreshSnapshot} onPress={handleRefreshSnapshot}>
-                <RefreshCw size={16} color={colors.green[600]} />
-                <Text style={styles.refreshSnapshotText}>Làm mới ảnh chụp</Text>
-                <View style={styles.countdownBadge}>
-                  <Text style={styles.countdownText}>{countdown}s</Text>
-                </View>
-              </TouchableOpacity>
-            )}
 
             {/* Camera details */}
             <View style={styles.detailCard}>
@@ -316,7 +296,7 @@ export default function CameraScreen() {
             <View style={styles.statusCard}>
               <View style={styles.statusRow}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Camera đang hoạt động bình thường</Text>
+                <Text style={styles.statusText}>Camera đang hoạt động (Tự động cập nhật 2s/lần)</Text>
               </View>
             </View>
           </ScrollView>
@@ -493,34 +473,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  refreshSnapshot: {
+  snapshotContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  modalLiveBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.full,
-    borderWidth: 1.5,
-    borderColor: colors.green[500],
-    alignSelf: 'center',
-  },
-  refreshSnapshotText: {
-    ...typography.bodySmall,
-    color: colors.green[600],
-    fontFamily: 'Inter_600SemiBold',
-  },
-  countdownBadge: {
-    backgroundColor: colors.green[100],
-    borderRadius: radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 4,
-  },
-  countdownText: {
-    fontSize: 11,
-    color: colors.green[700],
-    fontFamily: 'Inter_700Bold',
+    backgroundColor: 'rgba(220,38,38,0.9)',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    gap: 5,
   },
 
   detailCard: {

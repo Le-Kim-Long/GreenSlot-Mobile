@@ -9,7 +9,8 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Leaf, User, Lock, AlertCircle, ArrowRight, Sparkles } from 'lucide-react-native';
+import { Leaf, User, Lock, AlertCircle, ArrowRight, Sparkles, CheckSquare, Square } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -21,6 +22,7 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const { login, loginWithGoogle } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Validation states
   const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
@@ -40,6 +42,7 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
             GoogleSignin.configure({
               webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
               offlineAccess: true,
+              forceCodeForRefreshToken: true,
             });
           } catch (e) {
             console.warn('Google Signin configuration failed:', e);
@@ -49,6 +52,16 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
       .catch((err) => {
         console.warn('Failed to load Google Signin module:', err);
       });
+
+    // Load saved username if Remember Me was previously checked
+    AsyncStorage.getItem('greenslot_remembered_user')
+      .then(saved => {
+        if (saved) {
+          setUsername(saved);
+          setRememberMe(true);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const validateField = (field: 'username' | 'password', value: string) => {
@@ -106,7 +119,13 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     setLoading(true);
     try {
       const result = await login(username.trim(), password);
-      if (result !== true) {
+      if (result === true) {
+        if (rememberMe) {
+          await AsyncStorage.setItem('greenslot_remembered_user', username.trim());
+        } else {
+          await AsyncStorage.removeItem('greenslot_remembered_user');
+        }
+      } else {
         setApiError(typeof result === 'string' ? result : 'Tên đăng nhập hoặc mật khẩu không chính xác');
       }
     } catch (err: any) {
@@ -127,6 +146,12 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
         );
       }
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+      // Luôn gọi signOut trước để Google Play Services LUÔN hiển thị hộp thoại chọn tài khoản Google (Account Chooser)
+      try {
+        await GoogleSignin.signOut();
+      } catch (_) { }
+
       const response = await GoogleSignin.signIn();
 
       let idToken: string | null = null;
@@ -144,9 +169,9 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
         throw new Error('Không nhận được mã xác thực idToken từ Google.');
       }
 
-      const success = await loginWithGoogle(idToken);
-      if (!success) {
-        setApiError('Đăng nhập Google thất bại trên máy chủ.');
+      const result = await loginWithGoogle(idToken, 'login');
+      if (result !== true) {
+        setApiError(typeof result === 'string' ? result : 'Đăng nhập Google thất bại trên máy chủ.');
       }
     } catch (err: any) {
       console.warn('Google Signin Error:', err);
@@ -172,7 +197,7 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
           bounces={false}
         >
           <View style={styles.centeredWrapper}>
-            {/* Top Brand Header */}
+            {/* Top Brand Header - Exact Structure from Image 2 */}
             <View style={styles.brandHeader}>
               <View style={styles.logoBadge}>
                 <Leaf size={32} color={colors.white} />
@@ -210,7 +235,7 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                 onBlur={() => handleBlur('username')}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholder="Nhập tên đăng nhập"
+                placeholder="customer"
                 leftIcon={<User size={18} color={colors.green[600]} />}
                 error={touched.username ? errors.username : undefined}
                 containerStyle={styles.inputWrapper}
@@ -223,20 +248,35 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                 onChangeText={handleChangePassword}
                 onBlur={() => handleBlur('password')}
                 isPassword
-                placeholder="Nhập mật khẩu"
+                placeholder="GreenSlot@2024"
                 leftIcon={<Lock size={18} color={colors.green[600]} />}
                 error={touched.password ? errors.password : undefined}
                 containerStyle={styles.inputWrapper}
               />
 
-              {/* Forgot Password Link */}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ForgotPassword')}
-                activeOpacity={0.7}
-                style={styles.forgotBtn}
-              >
-                <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-              </TouchableOpacity>
+              {/* Remember Me & Forgot Password Row */}
+              <View style={styles.optionsRow}>
+                <TouchableOpacity
+                  style={styles.rememberRow}
+                  activeOpacity={0.8}
+                  onPress={() => setRememberMe(!rememberMe)}
+                >
+                  {rememberMe ? (
+                    <CheckSquare size={16} color={colors.green[600]} />
+                  ) : (
+                    <Square size={16} color={colors.gray[400]} />
+                  )}
+                  <Text style={styles.rememberText}>Ghi nhớ tài khoản</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ForgotPassword')}
+                  activeOpacity={0.7}
+                  style={styles.forgotBtn}
+                >
+                  <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* Login Button */}
               <Button
@@ -246,14 +286,14 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                 style={styles.loginBtn}
               />
 
-              {/* Google OAuth Divider */}
+              {/* Divider: Hoặc đăng nhập với */}
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>Hoặc đăng nhập với</Text>
                 <View style={styles.dividerLine} />
               </View>
 
-              {/* Google OAuth Button */}
+              {/* Google OAuth Button: Đăng nhập với Google */}
               <TouchableOpacity
                 style={styles.googleBtn}
                 onPress={handleGoogleLoginFlow}
@@ -261,17 +301,16 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                 activeOpacity={0.8}
               >
                 <View style={styles.googleBtnContent}>
-                  <View style={styles.googleIconCircle}>
-                    <Text style={[styles.googleIconLetter, { color: '#4285F4' }]}>G
-                      <Text style={{ color: '#EA4335' }}>o</Text>
-                      <Text style={{ color: '#FBBC05' }}>o</Text>
-                      <Text style={{ color: '#4285F4' }}>g</Text>
-                      <Text style={{ color: '#34A853' }}>l</Text>
-                      <Text style={{ color: '#EA4335' }}>e</Text>
-                    </Text>
+                  <View style={styles.googleLetters}>
+                    <Text style={[styles.googleLetter, { color: '#4285F4' }]}>G</Text>
+                    <Text style={[styles.googleLetter, { color: '#EA4335' }]}>o</Text>
+                    <Text style={[styles.googleLetter, { color: '#FBBC05' }]}>o</Text>
+                    <Text style={[styles.googleLetter, { color: '#4285F4' }]}>g</Text>
+                    <Text style={[styles.googleLetter, { color: '#34A853' }]}>l</Text>
+                    <Text style={[styles.googleLetter, { color: '#EA4335' }]}>e</Text>
                   </View>
                   <Text style={styles.googleBtnText}>
-                    {googleLoading ? 'Đang xác thực Google...' : 'Google'}
+                    {googleLoading ? 'Đang kết nối...' : 'Đăng nhập với Google'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -284,7 +323,9 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                   activeOpacity={0.7}
                   style={styles.registerLinkContainer}
                 >
-                  <Text style={styles.registerLink}>Đăng ký ngay</Text>
+                  <Text style={styles.registerLink} numberOfLines={1}>
+                    Đăng ký ngay
+                  </Text>
                   <ArrowRight size={14} color={colors.green[600]} />
                 </TouchableOpacity>
               </View>
@@ -359,7 +400,8 @@ const styles = StyleSheet.create({
   cardContainer: {
     backgroundColor: colors.white,
     borderRadius: 24,
-    padding: spacing.xl,
+    paddingHorizontal: spacing.lg + 2,
+    paddingVertical: spacing.lg,
     shadowColor: colors.green[900],
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
@@ -402,20 +444,37 @@ const styles = StyleSheet.create({
   inputWrapper: {
     marginBottom: spacing.sm + 2,
   },
-  forgotBtn: {
-    alignSelf: 'flex-end',
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: -spacing.xs,
     marginBottom: spacing.md,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  rememberText: {
+    color: colors.gray[600],
+    fontSize: 12.5,
+    fontFamily: 'Inter_500Medium',
+  },
+  forgotBtn: {
     paddingVertical: 2,
   },
   forgotText: {
     ...typography.bodySmall,
     color: colors.green[600],
     fontFamily: 'Inter_600SemiBold',
+    fontSize: 12.5,
   },
   loginBtn: {
     marginBottom: spacing.sm,
     borderRadius: 14,
+    backgroundColor: colors.green[600],
   },
   dividerRow: {
     flexDirection: 'row',
@@ -441,7 +500,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
     shadowColor: colors.gray[300],
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -451,17 +510,16 @@ const styles = StyleSheet.create({
   googleBtnContent: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  googleIconCircle: {
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    gap: 8,
   },
-  googleIconLetter: {
-    fontSize: 14,
-    fontFamily: 'Inter_900Black',
+  googleLetters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  googleLetter: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
     fontWeight: 'bold',
   },
   googleBtnText: {
@@ -473,25 +531,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    flexWrap: 'nowrap',
     paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.gray[100],
   },
   footerText: {
-    ...typography.body,
     color: colors.gray[500],
-    fontSize: 14,
+    fontSize: 13,
   },
   registerLinkContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   registerLink: {
-    ...typography.body,
     color: colors.green[600],
     fontFamily: 'Inter_700Bold',
-    fontSize: 14,
+    fontSize: 13,
   },
 });
-
