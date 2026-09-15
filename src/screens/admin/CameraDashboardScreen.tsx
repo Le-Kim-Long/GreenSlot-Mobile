@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Video, RefreshCw, AlertCircle, Camera, Wifi, X, Eye, ChevronRight } from 'lucide-react-native';
 import { cameraApi } from '../../api/cameraApi';
 import type { CameraDTO } from '../../api/cameraApi';
+import CameraStreamPlayer from '../../components/common/CameraStreamPlayer';
 import { colors } from '../../theme/colors';
 import { spacing, radius, typography } from '../../theme/typography';
 
@@ -26,12 +27,8 @@ export default function CameraDashboardScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedCamera, setSelectedCamera] = useState<CameraDTO | null>(null);
-  const [snapshotUri, setSnapshotUri] = useState<string | null>(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [streamUri, setStreamUri] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [tick, setTick] = useState(Date.now());
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const modalIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchCameras = async () => {
     setIsLoading(true);
@@ -48,49 +45,22 @@ export default function CameraDashboardScreen() {
 
   useEffect(() => {
     fetchCameras();
-    // Tự động làm mới khung hình camera sau mỗi 2 giây (2000ms)
-    intervalRef.current = setInterval(() => {
-      setTick(Date.now());
-    }, 2000);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  const refreshModalSnapshot = useCallback((captureUrl: string, initial = false) => {
-    if (initial) setSnapshotLoading(true);
-    const separator = captureUrl.includes('?') ? '&' : '?';
-    setSnapshotUri(`${captureUrl}${separator}t=${Date.now()}`);
-    if (initial) {
-      setTimeout(() => setSnapshotLoading(false), 250);
-    }
   }, []);
 
   const handleViewCamera = (cam: CameraDTO) => {
     setSelectedCamera(cam);
     setModalVisible(true);
-    if (cam.capture_url) {
-      refreshModalSnapshot(cam.capture_url, true);
-      if (modalIntervalRef.current) clearInterval(modalIntervalRef.current);
-      modalIntervalRef.current = setInterval(() => {
-        refreshModalSnapshot(cam.capture_url, false);
-      }, 2000);
-    } else if (cam.stream_url) {
-      setSnapshotUri(cam.stream_url);
+    if (cam.stream_url) {
+      setStreamUri(cam.stream_url);
     } else {
-      setSnapshotUri(null);
+      setStreamUri(null);
     }
   };
 
   const handleCloseModal = () => {
-    if (modalIntervalRef.current) {
-      clearInterval(modalIntervalRef.current);
-      modalIntervalRef.current = null;
-    }
     setModalVisible(false);
     setSelectedCamera(null);
-    setSnapshotUri(null);
+    setStreamUri(null);
   };
 
   return (
@@ -132,9 +102,7 @@ export default function CameraDashboardScreen() {
             </View>
           ) : (
             cameras.map((cam) => {
-              const previewUrl = cam.capture_url
-                ? `${cam.capture_url}${cam.capture_url.includes('?') ? '&' : '?'}t=${tick}`
-                : cam.stream_url;
+              const previewUrl = cam.stream_url || cam.capture_url;
 
               return (
                 <TouchableOpacity
@@ -155,13 +123,13 @@ export default function CameraDashboardScreen() {
                     </View>
                   </View>
 
-                  {/* Stream/Capture Box with LIVE badge */}
+                  {/* Stream Box with LIVE badge */}
                   <View style={styles.streamBox}>
                     {previewUrl ? (
-                      <Image
-                        source={{ uri: previewUrl }}
-                        style={styles.streamImage}
+                      <CameraStreamPlayer
+                        streamUrl={previewUrl}
                         resizeMode="cover"
+                        pointerEvents="none"
                       />
                     ) : (
                       <View style={styles.noStream}>
@@ -217,18 +185,11 @@ export default function CameraDashboardScreen() {
           <ScrollView contentContainerStyle={styles.modalContent}>
             {/* Modal Live Stream Container */}
             <View style={styles.modalStreamWrap}>
-              {snapshotLoading ? (
-                <View style={styles.modalPlaceholder}>
-                  <ActivityIndicator size="large" color={colors.green[600]} />
-                  <Text style={styles.modalLoadingText}>Đang tải luồng camera...</Text>
-                </View>
-              ) : snapshotUri ? (
+              {streamUri ? (
                 <View style={styles.modalStreamContainer}>
-                  <Image
-                    source={{ uri: snapshotUri }}
-                    style={styles.modalImage}
+                  <CameraStreamPlayer
+                    streamUrl={streamUri}
                     resizeMode="contain"
-                    onError={() => setSnapshotUri(null)}
                   />
                   <View style={styles.liveBadge}>
                     <View style={styles.liveDot} />
@@ -239,7 +200,7 @@ export default function CameraDashboardScreen() {
                 <View style={styles.modalPlaceholder}>
                   <Video size={48} color={colors.green[300]} />
                   <Text style={styles.modalPlaceholderText}>
-                    {selectedCamera?.capture_url ? 'Đang kết nối...' : 'Không có hình ảnh'}
+                    {selectedCamera?.stream_url ? 'Đang kết nối luồng camera...' : 'Camera này không hỗ trợ xem trực tiếp'}
                   </Text>
                 </View>
               )}
@@ -268,9 +229,9 @@ export default function CameraDashboardScreen() {
               <View style={styles.divider} />
 
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Capture URL</Text>
+                <Text style={styles.detailLabel}>Stream URL</Text>
                 <Text style={styles.detailValueMono} numberOfLines={2}>
-                  {selectedCamera?.capture_url || '—'}
+                  {selectedCamera?.stream_url || '—'}
                 </Text>
               </View>
             </View>
@@ -279,7 +240,7 @@ export default function CameraDashboardScreen() {
             <View style={styles.statusCard}>
               <View style={styles.statusRow}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Camera đang hoạt động (Tự động chụp 2s/lần)</Text>
+                <Text style={styles.statusText}>Camera đang hoạt động và phát trực tiếp ổn định</Text>
               </View>
             </View>
           </ScrollView>

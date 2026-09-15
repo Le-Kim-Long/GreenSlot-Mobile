@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, RefreshCw, X, Video, Wifi, WifiOff, ChevronRight, Eye } from 'lucide-react-native';
 import { cameraApi } from '../../api/cameraApi';
 import type { CameraDTO } from '../../api/cameraApi';
+import CameraStreamPlayer from '../../components/common/CameraStreamPlayer';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 
@@ -26,10 +27,8 @@ export default function CameraScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<CameraDTO | null>(null);
-  const [snapshotUri, setSnapshotUri] = useState<string | null>(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [streamUri, setStreamUri] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadCameras = useCallback(async () => {
     try {
@@ -53,56 +52,21 @@ export default function CameraScreen() {
     loadCameras();
   };
 
-  const refreshSnapshot = useCallback((captureUrl: string, initial = false) => {
-    if (initial) {
-      setSnapshotLoading(true);
-    }
-    const separator = captureUrl.includes('?') ? '&' : '?';
-    setSnapshotUri(`${captureUrl}${separator}t=${Date.now()}`);
-    if (initial) {
-      setTimeout(() => setSnapshotLoading(false), 250);
-    }
-  }, []);
-
-  const startAutoRefresh = useCallback((captureUrl: string) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    // Tự động làm mới khung hình mỗi 2 giây
-    intervalRef.current = setInterval(() => {
-      refreshSnapshot(captureUrl, false);
-    }, 2000);
-  }, [refreshSnapshot]);
-
-  const stopAutoRefresh = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
   const handleViewCamera = (camera: CameraDTO) => {
     setSelectedCamera(camera);
     setModalVisible(true);
-    if (camera.capture_url) {
-      refreshSnapshot(camera.capture_url, true);
-      startAutoRefresh(camera.capture_url);
-    } else if (camera.stream_url) {
-      setSnapshotUri(camera.stream_url);
+    if (camera.stream_url) {
+      setStreamUri(camera.stream_url);
     } else {
-      setSnapshotUri(null);
+      setStreamUri(null);
     }
   };
 
   const handleCloseModal = () => {
-    stopAutoRefresh();
     setModalVisible(false);
     setSelectedCamera(null);
-    setSnapshotUri(null);
+    setStreamUri(null);
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => stopAutoRefresh();
-  }, [stopAutoRefresh]);
 
   if (loading) {
     return (
@@ -161,11 +125,11 @@ export default function CameraScreen() {
               >
                 {/* Thumbnail preview */}
                 <View style={styles.thumbnail}>
-                  {cam.capture_url ? (
-                    <Image
-                      source={{ uri: cam.capture_url }}
-                      style={styles.thumbnailImg}
+                  {cam.stream_url || cam.capture_url ? (
+                    <CameraStreamPlayer
+                      streamUrl={cam.stream_url || cam.capture_url!}
                       resizeMode="cover"
+                      pointerEvents="none"
                     />
                   ) : (
                     <View style={styles.thumbnailPlaceholder}>
@@ -222,20 +186,13 @@ export default function CameraScreen() {
           </View>
 
           <ScrollView contentContainerStyle={styles.modalContent}>
-            {/* Snapshot View */}
+            {/* Stream View */}
             <View style={styles.snapshotWrap}>
-              {snapshotLoading ? (
-                <View style={styles.snapshotPlaceholder}>
-                  <ActivityIndicator size="large" color={colors.green[600]} />
-                  <Text style={styles.snapshotLoadingText}>Đang tải luồng hình ảnh...</Text>
-                </View>
-              ) : snapshotUri ? (
+              {streamUri ? (
                 <View style={styles.snapshotContainer}>
-                  <Image
-                    source={{ uri: snapshotUri }}
-                    style={styles.snapshotImage}
+                  <CameraStreamPlayer
+                    streamUrl={streamUri}
                     resizeMode="contain"
-                    onError={() => setSnapshotUri(null)}
                   />
                   <View style={styles.modalLiveBadge}>
                     <View style={styles.liveDot} />
@@ -246,9 +203,9 @@ export default function CameraScreen() {
                 <View style={styles.snapshotPlaceholder}>
                   <Video size={56} color={colors.green[300]} />
                   <Text style={styles.snapshotPlaceholderText}>
-                    {selectedCamera?.capture_url
-                      ? 'Đang kết nối luồng hình ảnh...'
-                      : 'Không có hình ảnh'}
+                    {selectedCamera?.stream_url
+                      ? 'Đang kết nối luồng camera...'
+                      : 'Camera này không hỗ trợ xem trực tiếp'}
                   </Text>
                 </View>
               )}
@@ -282,21 +239,13 @@ export default function CameraScreen() {
                   {selectedCamera?.stream_url || '—'}
                 </Text>
               </View>
-              <View style={styles.divider} />
-
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Capture URL</Text>
-                <Text style={styles.detailValueMono} numberOfLines={2}>
-                  {selectedCamera?.capture_url || '—'}
-                </Text>
-              </View>
             </View>
 
             {/* Status indicator */}
             <View style={styles.statusCard}>
               <View style={styles.statusRow}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Camera đang hoạt động (Tự động cập nhật 2s/lần)</Text>
+                <Text style={styles.statusText}>Camera đang hoạt động và phát trực tiếp ổn định</Text>
               </View>
             </View>
           </ScrollView>

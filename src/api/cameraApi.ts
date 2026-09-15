@@ -5,7 +5,7 @@ export interface CameraDTO {
   name: string;
   ip: string;
   stream_url: string;
-  capture_url: string;
+  capture_url?: string;
 }
 
 export const cameraApi = {
