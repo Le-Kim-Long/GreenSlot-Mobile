@@ -70,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.email,
           role,
           createdAt: new Date().toISOString(),
+          locationId: data.locationId,
+          locationName: data.locationName,
         };
 
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(loggedUser));
@@ -128,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.email,
       role,
       createdAt: new Date().toISOString(),
+      locationId: data.locationId,
+      locationName: data.locationName,
     };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(loggedUser));
     setUser(loggedUser);

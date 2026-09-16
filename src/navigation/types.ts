@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
-import type { AvailableSlotDTO, BookingHistory, ActiveRentalDTO } from '../types/api';
+import type { AvailableSlotDTO, BookingHistory, ActiveRentalDTO, AlertDTO } from '../types/api';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -43,8 +43,8 @@ export type CustomerStackParamList = {
 
 export type GardenStaffTabParamList = {
   GardenStaffDashboard: undefined;
-  TaskManagement: undefined;
-  StaffList: undefined;
+  StaffMySchedule: undefined;
+  GardenStaffPumpControl: undefined;
   Account: undefined;
 };
 
@@ -54,7 +54,12 @@ export type GardenStaffStackParamList = {
   IoTMonitoring: undefined;
   IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
   GardenStaffAlert: undefined;
+  GardenStaffAlertProcess: { alert: AlertDTO };
   IoTOperations: undefined;
+  StaffMySchedule: undefined;
+  GardenStaffPumpControl: undefined;
+  GardenStaffHarvestHistory: undefined;
+  GardenStaffCamera: undefined;
 };
 
 export type StaffTabParamList = {

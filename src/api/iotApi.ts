@@ -46,4 +46,5 @@ export const iotApi = {
   deleteThreshold: (id: number) => apiClient.delete(`/iot/sensors/thresholds/${id}`).then(r => r.data),
   getSlotPillars: (slotId: number) => apiClient.get(`/iot/slot/${slotId}/pillars`).then(r => r.data),
   getCameraSnapshot: (slotId: number) => apiClient.get(`/iot/camera/${slotId}`, { responseType: 'blob' }).then(r => r.data),
+  getMonitoredPillars: (): Promise<any[]> => apiClient.get('/iot/monitored-pillars').then(r => r.data),
 };

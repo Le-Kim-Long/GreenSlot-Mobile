@@ -5,6 +5,9 @@ export const staffScheduleApi = {
   getSchedules: (): Promise<StaffScheduleDTO[]> =>
     apiClient.get('/staff-schedules').then(r => r.data),
 
+  getMySchedules: (): Promise<StaffScheduleDTO[]> =>
+    apiClient.get('/staff-schedules/my-schedules').then(r => r.data),
+
   getScheduleById: (id: number): Promise<StaffScheduleDTO> =>
     apiClient.get(`/staff-schedules/${id}`).then(r => r.data),
 

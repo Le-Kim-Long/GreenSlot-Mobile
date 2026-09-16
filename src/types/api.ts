@@ -22,6 +22,8 @@ export interface User {
   roles?: string[];
   enabled?: boolean;
   createdAt?: string;
+  locationId?: number;
+  locationName?: string;
 }
 
 export interface ProfileResponseDTO {
@@ -56,6 +58,8 @@ export interface JwtResponse {
   email: string;
   fullName: string;
   roles: string[];
+  locationId?: number;
+  locationName?: string;
 }
 
 export interface PillarDetail {
@@ -206,9 +210,11 @@ export interface TaskStatusUpdateDTO {
 }
 
 export interface IssueReportRequestDTO {
-  issueType: string;
+  issueType?: string;
+  issueTitle?: string;
   description: string;
   imageUrl?: string;
+  evidenceImageUrl?: string;
 }
 
 export interface GardeningTaskResponseDTO {
@@ -336,6 +342,9 @@ export interface TreeDTO {
   growthDurationDays?: number;
   minRentalDays?: number;
   price?: number;
+  priceSmall?: number;
+  priceMedium?: number;
+  priceLarge?: number;
   imageUrl?: string;
   soilMoistureMin?: number;
   soilMoistureMax?: number;
@@ -376,12 +385,26 @@ export interface TreePlantingRequestDTO {
   reason: string;
   notes?: string;
   price?: number;
+  amount?: number;
+  isPaid?: boolean;
   paymentUrl?: string;
   rejectReason?: string; // populated by backend when status=REJECTED
   requestedAt: string;
   processedAt?: string;
   processedById?: number;
   processedByName?: string;
+}
+
+export interface EligibleHarvestRental {
+  rentalId: number;
+  pillarId?: number;
+  pillarCode?: string;
+  slotNumber: string;
+  treeName: string;
+  plantedAt?: string;
+  pillarCodes?: string;
+  harvestDays?: number;
+  daysGrown?: number;
 }
 
 export interface LocationDTO {

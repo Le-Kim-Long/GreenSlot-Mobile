@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,15 +24,16 @@ import {
   ChevronLeft,
   Info,
 } from 'lucide-react-native';
-import { cameraApi } from '../../api/cameraApi';
-import type { CameraDTO } from '../../api/cameraApi';
+import { cameraApi, type CameraDTO } from '../../api/cameraApi';
 import CameraStreamPlayer from '../../components/common/CameraStreamPlayer';
 import { colors } from '../../theme/colors';
-import { typography, spacing, radius } from '../../theme/typography';
+import { spacing, radius } from '../../theme/typography';
+import { EmptyState } from '../../components/common/EmptyState';
+import { LoadingScreen } from '../../components/ui/LoadingScreen';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function CameraScreen() {
+export default function GardenStaffCameraScreen() {
   const [cameras, setCameras] = useState<CameraDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,7 +44,7 @@ export default function CameraScreen() {
   const loadCameras = useCallback(async () => {
     try {
       const data = await cameraApi.getActiveCameras();
-      setCameras(data);
+      setCameras(data || []);
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Không thể tải danh sách camera.';
       Alert.alert('Lỗi', msg);
@@ -81,105 +82,84 @@ export default function CameraScreen() {
     setFullscreenVisible(false);
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.green[600]} />
-          <Text style={styles.loadingText}>Đang tải camera...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Hệ thống Camera Vườn</Text>
+          <Text style={styles.headerSub}>
+            {cameras.length > 0
+              ? `${cameras.length} camera đang hoạt động`
+              : 'Giám sát trực tiếp các khu vực canh tác'}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh} activeOpacity={0.8}>
+          <RefreshCw size={18} color={colors.white} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.green[600]} />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerIconWrap}>
-            <Camera size={28} color={colors.green[600]} />
-          </View>
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>Camera giám sát</Text>
-            <Text style={styles.headerSub}>
-              {cameras.length > 0 ? `${cameras.length} camera đang hoạt động` : 'Không có camera nào'}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
-            <RefreshCw size={18} color={colors.green[600]} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Camera list */}
         {cameras.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <View style={styles.emptyIcon}>
-              <WifiOff size={48} color={colors.gray[300]} />
-            </View>
-            <Text style={styles.emptyTitle}>Chưa có camera nào</Text>
-            <Text style={styles.emptySub}>
-              Hệ thống chưa ghi nhận camera nào đang hoạt động.
-            </Text>
-          </View>
+          <EmptyState
+            title="Không có camera khả dụng"
+            subtitle="Hiện tại không tìm thấy thiết bị camera đang hoạt động tại cơ sở vườn."
+          />
         ) : (
-          <View style={styles.cameraList}>
-            {cameras.map((cam) => (
-              <TouchableOpacity
-                key={cam.cam_id}
-                style={styles.cameraCard}
-                activeOpacity={0.85}
-                onPress={() => handleOpenDetail(cam)}
-              >
-                {/* Left: icon + info */}
-                <View style={styles.cardLeft}>
-                  <View style={styles.cardIconBox}>
-                    <Camera size={22} color={colors.green[600]} />
-                  </View>
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cameraName} numberOfLines={1}>{cam.name}</Text>
-                    <Text style={styles.cameraIp}>IP: {cam.ip}</Text>
-                    <View style={styles.livePill}>
-                      <View style={styles.liveDot} />
-                      <Text style={styles.liveText}>LIVE</Text>
-                    </View>
+          cameras.map(camera => (
+            <TouchableOpacity
+              key={camera.cam_id}
+              style={styles.cameraCard}
+              activeOpacity={0.85}
+              onPress={() => handleOpenDetail(camera)}
+            >
+              {/* Card content: icon + info + arrow */}
+              <View style={styles.cardLeft}>
+                <View style={styles.iconBox}>
+                  <Camera size={22} color={colors.green[600]} />
+                </View>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.cameraName} numberOfLines={1}>{camera.name}</Text>
+                  <Text style={styles.cameraIp}>IP: {camera.ip}</Text>
+                  <View style={styles.livePill}>
+                    <View style={styles.liveDot} />
+                    <Text style={styles.liveText}>LIVE</Text>
                   </View>
                 </View>
+              </View>
 
-                {/* Right: badge + button */}
-                <View style={styles.cardRight}>
-                  <View style={styles.onlineBadge}>
-                    <Wifi size={10} color={colors.green[600]} />
-                    <Text style={styles.onlineText}>Online</Text>
-                  </View>
-                  <View style={styles.viewBtn}>
-                    <Eye size={14} color={colors.white} />
-                    <Text style={styles.viewBtnText}>Xem</Text>
-                  </View>
+              <View style={styles.cardRight}>
+                <View style={styles.onlineBadge}>
+                  <Wifi size={12} color={colors.green[700]} />
+                  <Text style={styles.onlineText}>Online</Text>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+                <View style={styles.viewBtn}>
+                  <Eye size={14} color={colors.white} />
+                  <Text style={styles.viewBtnText}>Xem</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
         )}
       </ScrollView>
 
       {/* ── Detail Modal ── */}
       <Modal visible={detailVisible} animationType="slide" onRequestClose={handleCloseDetail}>
-        <SafeAreaView style={styles.modalSafe}>
+        <SafeAreaView style={styles.modalContainer}>
           {/* Modal Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity style={styles.modalBackBtn} onPress={handleCloseDetail} activeOpacity={0.8}>
               <ChevronLeft size={22} color={colors.white} />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle} numberOfLines={1}>
-                {selectedCamera?.name || 'Camera'}
-              </Text>
+              <Text style={styles.modalTitle} numberOfLines={1}>{selectedCamera?.name}</Text>
               <Text style={styles.modalSub}>IP: {selectedCamera?.ip}</Text>
             </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={handleCloseDetail} activeOpacity={0.8}>
@@ -192,17 +172,12 @@ export default function CameraScreen() {
             {selectedCamera?.stream_url ? (
               <CameraStreamPlayer
                 streamUrl={selectedCamera.stream_url}
-                resizeMode="contain"
                 style={styles.streamPlayer}
               />
             ) : (
               <View style={styles.noStreamBox}>
                 <WifiOff size={48} color={colors.gray[500]} />
-                <Text style={styles.noStreamText}>
-                  {selectedCamera?.stream_url
-                    ? 'Đang kết nối...'
-                    : 'Camera này không hỗ trợ xem trực tiếp'}
-                </Text>
+                <Text style={styles.noStreamText}>Chưa có luồng stream trực tiếp</Text>
               </View>
             )}
             {/* Live badge overlay */}
@@ -210,27 +185,26 @@ export default function CameraScreen() {
               <View style={styles.liveDot} />
               <Text style={styles.liveText}>LIVE</Text>
             </View>
-            {/* Fullscreen button */}
+            {/* Fullscreen button overlay */}
             {selectedCamera?.stream_url && (
               <TouchableOpacity
-                style={styles.fullscreenOverlayBtn}
+                style={styles.fullscreenBtn}
                 onPress={handleOpenFullscreen}
                 activeOpacity={0.85}
               >
                 <Maximize2 size={18} color={colors.white} />
-                <Text style={styles.fullscreenOverlayText}>Phóng to toàn màn hình</Text>
+                <Text style={styles.fullscreenBtnText}>Phóng to toàn màn hình</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Camera Info */}
+          {/* Camera Info Card */}
           <ScrollView contentContainerStyle={styles.detailContent}>
             <View style={styles.infoCard}>
               <View style={styles.infoCardHeader}>
                 <Info size={15} color={colors.green[700]} />
                 <Text style={styles.infoCardTitle}>Thông tin camera</Text>
               </View>
-
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Tên camera</Text>
                 <Text style={styles.infoValue}>{selectedCamera?.name}</Text>
@@ -267,7 +241,7 @@ export default function CameraScreen() {
       {/* ── Fullscreen Modal ── */}
       <Modal visible={fullscreenVisible} animationType="fade" onRequestClose={handleCloseFullscreen}>
         <View style={styles.fullscreenContainer}>
-          <SafeAreaView style={styles.fullscreenHeader}>
+          <SafeAreaView style={styles.fullscreenSafe}>
             <TouchableOpacity
               style={styles.fullscreenCloseBtn}
               onPress={handleCloseFullscreen}
@@ -290,68 +264,43 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  loadingText: { ...typography.body, color: colors.gray[500] },
-
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xl,
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.green[600],
   },
-  headerIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.lg,
-    backgroundColor: colors.green[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerText: { flex: 1 },
-  headerTitle: { ...typography.heading3, color: colors.gray[900] },
-  headerSub: { ...typography.bodySmall, color: colors.gray[500], marginTop: 2 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.white },
+  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
   refreshBtn: {
-    width: 40,
-    height: 40,
+    padding: 8,
     borderRadius: radius.md,
-    backgroundColor: colors.green[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
 
-  emptyWrap: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.md },
-  emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: radius.xl,
-    backgroundColor: colors.gray[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: { ...typography.heading3, color: colors.gray[600] },
-  emptySub: { ...typography.body, color: colors.gray[400], textAlign: 'center' },
+  content: { padding: spacing.md, paddingBottom: 32, gap: 12 },
 
-  cameraList: { gap: spacing.md },
+  // Camera list card
   cameraCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.white,
-    borderRadius: radius.xl,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.green[100],
+    borderColor: '#e2e8f0',
     padding: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  cardIconBox: {
+  iconBox: {
     width: 46,
     height: 46,
     borderRadius: 12,
@@ -360,8 +309,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardInfo: { flex: 1, gap: 3 },
-  cameraName: { ...typography.label, color: colors.gray[900] },
-  cameraIp: { ...typography.caption, color: colors.gray[400] },
+  cameraName: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  cameraIp: { fontSize: 11, color: '#64748b' },
   livePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -371,7 +320,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
-    marginTop: 2,
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' },
   liveText: { fontSize: 10, fontWeight: '800', color: '#dc2626', letterSpacing: 0.5 },
@@ -379,13 +327,15 @@ const styles = StyleSheet.create({
   onlineBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.green[50],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    gap: 3,
+    borderWidth: 1,
+    borderColor: colors.green[200],
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  onlineText: { fontSize: 11, color: colors.green[700], fontFamily: 'Inter_500Medium' },
+  onlineText: { fontSize: 11, fontWeight: '700', color: colors.green[700] },
   viewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -398,7 +348,7 @@ const styles = StyleSheet.create({
   viewBtnText: { fontSize: 12, fontWeight: '700', color: colors.white },
 
   // Detail Modal
-  modalSafe: { flex: 1, backgroundColor: '#0f172a' },
+  modalContainer: { flex: 1, backgroundColor: '#0f172a' },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -434,7 +384,7 @@ const styles = StyleSheet.create({
   },
   streamPlayer: { width: '100%', height: '100%' },
   noStreamBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  noStreamText: { fontSize: 13, color: '#64748b', textAlign: 'center', paddingHorizontal: 24 },
+  noStreamText: { fontSize: 13, color: '#64748b', textAlign: 'center' },
   streamLiveBadge: {
     position: 'absolute',
     top: 10,
@@ -447,7 +397,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
-  fullscreenOverlayBtn: {
+  fullscreenBtn: {
     position: 'absolute',
     bottom: 10,
     right: 10,
@@ -461,7 +411,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  fullscreenOverlayText: { fontSize: 12, fontWeight: '700', color: colors.white },
+  fullscreenBtnText: { fontSize: 12, fontWeight: '700', color: colors.white },
 
   detailContent: { padding: 16, gap: 12 },
   infoCard: {
@@ -490,7 +440,6 @@ const styles = StyleSheet.create({
   infoValue: { fontSize: 12, color: '#e2e8f0', fontWeight: '600', flex: 1, textAlign: 'right' },
   infoValueMono: { fontWeight: '400', fontSize: 11, color: '#94a3b8' },
   infoDivider: { height: 1, backgroundColor: '#334155' },
-
   statusCard: {
     backgroundColor: '#14532d',
     borderRadius: 12,
@@ -504,7 +453,7 @@ const styles = StyleSheet.create({
 
   // Fullscreen Modal
   fullscreenContainer: { flex: 1, backgroundColor: '#000' },
-  fullscreenHeader: {
+  fullscreenSafe: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,

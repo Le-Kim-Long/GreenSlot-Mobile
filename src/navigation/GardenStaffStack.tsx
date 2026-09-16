@@ -1,18 +1,20 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { CheckSquare, ClipboardList, Users, User } from 'lucide-react-native';
+import { CheckSquare, Calendar, Droplets, User } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import GardenStaffDashboardScreen from '../screens/garden-staff/GardenStaffDashboardScreen';
-import TaskManagementScreen from '../screens/staff/TaskManagementScreen';
-import StaffListScreen from '../screens/staff/StaffListScreen';
 import GardenStaffAccountScreen from '../screens/garden-staff/GardenStaffAccountScreen';
 import IoTMonitoringScreen from '../screens/customer/IoTMonitoringScreen';
 import IoTDetailScreen from '@/screens/customer/IoTDetailScreen';
 import type { GardenStaffTabParamList, GardenStaffStackParamList } from './types';
 import GardenStaffAlertScreen from '@/screens/garden-staff/GardenStaffAlertScreen';
+import GardenStaffAlertProcessScreen from '../screens/garden-staff/GardenStaffAlertProcessScreen';
 import IoTOperationsScreen from '../screens/staff/IoTOperationsScreen';
-
+import StaffMyScheduleScreen from '../screens/garden-staff/StaffMyScheduleScreen';
+import GardenStaffPumpControlScreen from '../screens/garden-staff/GardenStaffPumpControlScreen';
+import GardenStaffHarvestHistoryScreen from '../screens/garden-staff/GardenStaffHarvestHistoryScreen';
+import GardenStaffCameraScreen from '../screens/garden-staff/GardenStaffCameraScreen';
 
 const Tab = createBottomTabNavigator<GardenStaffTabParamList>();
 const Stack = createNativeStackNavigator<GardenStaffStackParamList>();
@@ -28,6 +30,13 @@ function GardenStaffTabNavigator() {
           borderTopWidth: 1,
           borderTopColor: colors.gray[200],
           backgroundColor: '#fff',
+          height: 60,
+          paddingBottom: 6,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: {
+          fontFamily: 'Inter_500Medium',
+          fontSize: 11,
         },
       }}
     >
@@ -40,19 +49,19 @@ function GardenStaffTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="TaskManagement"
-        component={TaskManagementScreen}
+        name="StaffMySchedule"
+        component={StaffMyScheduleScreen}
         options={{
-          tabBarLabel: 'Giao việc',
-          tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
+          tabBarLabel: 'Lịch trực',
+          tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
         }}
       />
       <Tab.Screen
-        name="StaffList"
-        component={StaffListScreen}
+        name="GardenStaffPumpControl"
+        component={GardenStaffPumpControlScreen}
         options={{
-          tabBarLabel: 'Nhân viên',
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
+          tabBarLabel: 'Máy bơm',
+          tabBarIcon: ({ color, size }) => <Droplets color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -95,9 +104,34 @@ export function GardenStaffStack() {
       <Stack.Screen
         name="GardenStaffAlert"
         component={GardenStaffAlertScreen}
-        options={{ title: 'Khắc phục sự cố IoT' }}
+        options={{ title: 'Khắc phục sự cố IoT', headerShown: true }}
+      />
+      <Stack.Screen
+        name="GardenStaffAlertProcess"
+        component={GardenStaffAlertProcessScreen}
+        options={{ title: 'Xử lý cảnh báo', headerShown: false }}
       />
       <Stack.Screen name="IoTOperations" component={IoTOperationsScreen} options={{ title: 'Vận hành IoT' }} />
+      <Stack.Screen
+        name="StaffMySchedule"
+        component={StaffMyScheduleScreen}
+        options={{ title: 'Lịch trực của tôi', headerShown: true }}
+      />
+      <Stack.Screen
+        name="GardenStaffPumpControl"
+        component={GardenStaffPumpControlScreen}
+        options={{ title: 'Điều khiển máy bơm' }}
+      />
+      <Stack.Screen
+        name="GardenStaffHarvestHistory"
+        component={GardenStaffHarvestHistoryScreen}
+        options={{ title: 'Lịch sử thu hoạch' }}
+      />
+      <Stack.Screen
+        name="GardenStaffCamera"
+        component={GardenStaffCameraScreen}
+        options={{ title: 'Camera giám sát' }}
+      />
     </Stack.Navigator>
   );
 }

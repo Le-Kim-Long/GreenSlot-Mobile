@@ -31,6 +31,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
   const [activeTrees, setActiveTrees] = useState<TreeDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paidRequestIds, setPaidRequestIds] = useState<Set<number>>(new Set());
 
   // Filters
   const [search, setSearch] = useState('');
@@ -55,15 +56,60 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [reqs, history, trees] = await Promise.allSettled([
+      const [reqs, history, trees, availableSlots] = await Promise.allSettled([
         treePlantingApi.getMyRequests(),
         bookingApi.getHistory(),
         treeApi.getActiveTrees(),
+        bookingApi.getAvailableSlots(),
       ]);
 
       if (reqs.status === 'fulfilled') setRequests(reqs.value);
       if (history.status === 'fulfilled') {
-        const actives = history.value.filter((r) => r.status === 'ACTIVE' || r.status === 'PAID');
+        // Collect all paid PLANT_ request IDs from transaction history
+        const paidIds = new Set<number>();
+        history.value.forEach(rental => {
+          rental.transactions?.forEach(tx => {
+            if (tx.vnpTxnRef?.startsWith('PLANT_') && (tx.status === 'SUCCESS' || tx.status === 'PAID')) {
+              const parts = tx.vnpTxnRef.split('_');
+              if (parts.length >= 2) {
+                const rId = parseInt(parts[1], 10);
+                if (!isNaN(rId)) paidIds.add(rId);
+              }
+            }
+          });
+        });
+        if (paidIds.size > 0) {
+          setPaidRequestIds(prev => new Set([...prev, ...paidIds]));
+        }
+
+        // Build slots map to enrich pillars with capacityHoles and pillarType
+        const slotsMap = new Map<string, any>();
+        if (availableSlots.status === 'fulfilled') {
+          availableSlots.value.forEach((s: any) => {
+            if (s.slotNumber) slotsMap.set(s.slotNumber, s);
+            if (s.id) slotsMap.set(String(s.id), s);
+          });
+        }
+
+        const actives = history.value.filter((r) => r.status === 'ACTIVE' || r.status === 'PAID').map(r => {
+          const matchedSlot = slotsMap.get(r.slotNumber) || (r.slotId ? slotsMap.get(String(r.slotId)) : null);
+          if (matchedSlot?.pillars && matchedSlot.pillars.length > 0) {
+            const enrichedPillars = (r.pillars || []).map(p => {
+              const matchedP = matchedSlot.pillars?.find((sp: any) => sp.id === p.id || sp.pillarCode === p.pillarCode);
+              return {
+                ...p,
+                capacityHoles: p.capacityHoles ?? matchedP?.capacityHoles ?? 36,
+                pillarType: p.pillarType ?? matchedP?.pillarType ?? 'MEDIUM',
+              };
+            });
+            return {
+              ...r,
+              pillars: enrichedPillars.length > 0 ? enrichedPillars : matchedSlot.pillars,
+            };
+          }
+          return r;
+        });
+
         setActiveRentals(actives);
         // Auto-select rental if navigated with rentalId param
         if (initialRentalId) {
@@ -108,30 +154,41 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
   };
 
   /**
-   * Mirror backend's Tree.getEffectivePriceForPillar():
-   * Checks pillarType first (LARGE / MEDIUM) and also holes count.
+   * Mirror backend's Tree.getEffectivePriceForPillar() & Pillar.getEffectivePillarType():
+   * Priority: capacityHoles (<= 24: SMALL, <= 36: MEDIUM, > 36: LARGE).
    */
   const getTreePriceForPillar = (tree: TreeDTO | null, pillar?: PillarDetail | null) => {
     if (!tree) return 0;
     const price = tree.price || 0;
-    const priceLarge = (tree as any).priceLarge;
-    const priceMedium = (tree as any).priceMedium;
-    const priceSmall = (tree as any).priceSmall;
+    const priceSmall = tree.priceSmall != null && Number(tree.priceSmall) > 0 ? Number(tree.priceSmall) : price;
+    const priceMedium = tree.priceMedium != null && Number(tree.priceMedium) > 0 ? Number(tree.priceMedium) : priceSmall * 1.5;
+    const priceLarge = tree.priceLarge != null && Number(tree.priceLarge) > 0 ? Number(tree.priceLarge) : priceSmall * 2.0;
 
-    const effectivePriceSmall = priceSmall != null && Number(priceSmall) > 0 ? Number(priceSmall) : price;
-    const effectivePriceMedium = priceMedium != null && Number(priceMedium) > 0 ? Number(priceMedium) : effectivePriceSmall * 1.5;
-    const effectivePriceLarge = priceLarge != null && Number(priceLarge) > 0 ? Number(priceLarge) : effectivePriceSmall * 2.0;
+    if (!pillar) return priceSmall;
 
-    if (!pillar) return effectivePriceSmall;
+    const holes = pillar.capacityHoles != null && pillar.capacityHoles > 0 ? pillar.capacityHoles : 24;
 
-    const holes = pillar.capacityHoles ?? 24;
-    const type = (pillar.pillarType ?? '').toUpperCase();
+    // Backend Pillar.getEffectivePillarType() logic:
+    // If capacityHoles > 0: <= 24 is SMALL, <= 36 is MEDIUM, else LARGE
+    let effectiveType = 'SMALL';
+    if (pillar.capacityHoles != null && pillar.capacityHoles > 0) {
+      if (pillar.capacityHoles <= 24) effectiveType = 'SMALL';
+      else if (pillar.capacityHoles <= 36) effectiveType = 'MEDIUM';
+      else effectiveType = 'LARGE';
+    } else if (pillar.pillarType) {
+      effectiveType = pillar.pillarType.toUpperCase();
+    }
 
-    // Match backend: if type is LARGE or holes >= 48 → priceLarge
-    if (type === 'LARGE' || holes >= 48) return effectivePriceLarge;
-    // If type is MEDIUM or holes >= 36 → priceMedium
-    if (type === 'MEDIUM' || holes >= 36) return effectivePriceMedium;
-    return effectivePriceSmall;
+    if (holes >= 48 || effectiveType === 'LARGE') return priceLarge;
+    if (holes >= 36 || effectiveType === 'MEDIUM') return priceMedium;
+    return priceSmall;
+  };
+
+  const isRequestPaid = (item: TreePlantingRequestDTO) => {
+    if (item.isPaid) return true;
+    if (paidRequestIds.has(item.id)) return true;
+    if (item.status === 'APPROVED' || item.status === 'COMPLETED') return true;
+    return false;
   };
 
   const getEstimatedCost = () => {
@@ -199,6 +256,9 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
 
               if (response.paymentUrl) {
                 const settled = await openAndWaitForPayment(response.paymentUrl, bookingApi.getHistory, selectedRental.id);
+                if (settled.status === 'success' && response.id) {
+                  setPaidRequestIds(prev => new Set([...prev, response.id]));
+                }
                 setIsCreateOpen(false);
                 fetchData();
                 navigation.replace('PaymentResult', {
@@ -233,17 +293,20 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
     );
   };
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'APPROVED':
-        return { bg: colors.green[50], txt: colors.green[700], label: 'Đã duyệt' };
-      case 'PENDING_PAYMENT':
-        return { bg: '#fff7ed', txt: '#ea580c', label: 'Chờ thanh toán' };
-      case 'REJECTED':
-        return { bg: '#fee2e2', txt: '#dc2626', label: 'Từ chối' };
-      default:
-        return { bg: '#fef3c7', txt: '#d97706', label: 'Chờ duyệt' };
+  const getStatusStyle = (item: TreePlantingRequestDTO) => {
+    if (item.status === 'APPROVED') {
+      return { bg: colors.green[50], txt: colors.green[700], label: 'Đã duyệt' };
     }
+    if (item.status === 'REJECTED') {
+      return { bg: '#fee2e2', txt: '#dc2626', label: 'Từ chối' };
+    }
+    if (isRequestPaid(item)) {
+      return { bg: colors.green[50], txt: colors.green[700], label: 'Đã thanh toán (Chờ duyệt)' };
+    }
+    if (item.paymentUrl) {
+      return { bg: '#fff7ed', txt: '#ea580c', label: 'Chờ thanh toán' };
+    }
+    return { bg: '#fef3c7', txt: '#d97706', label: 'Chờ duyệt' };
   };
 
   const filteredRequests = requests.filter((r) => {
@@ -315,8 +378,9 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => {
-            const status = getStatusStyle(item.status);
-            const isPendingPay = item.status === 'PENDING_PAYMENT';
+            const status = getStatusStyle(item);
+            const paid = isRequestPaid(item);
+            const showPayNow = !paid && !!item.paymentUrl && item.status === 'PENDING';
 
             return (
               <TouchableOpacity style={styles.card} onPress={() => setSelectedDetail(item)}>
@@ -338,12 +402,18 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                   Lý do: {item.reason}
                 </Text>
 
-                {isPendingPay && item.paymentUrl && (
+                {showPayNow && (
                   <TouchableOpacity
                     style={styles.payNowBtn}
                     onPress={async (e) => {
                       e.stopPropagation?.();
-                      await Linking.openURL(item.paymentUrl!);
+                      if (item.paymentUrl) {
+                        const settled = await openAndWaitForPayment(item.paymentUrl, bookingApi.getHistory, item.rentalId);
+                        if (settled.status === 'success') {
+                          setPaidRequestIds(prev => new Set([...prev, item.id]));
+                        }
+                        fetchData();
+                      }
                     }}
                   >
                     <CreditCard size={14} color={colors.white} />
@@ -434,6 +504,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                   <CreditCard size={15} color={colors.green[700]} />
                   <Text style={styles.costText}>
                     Chi phí phôi giống dự kiến: <Text style={{ fontWeight: '700' }}>{formatCurrency(estimatedTreeCost)}</Text>
+                    {selectedPillar ? ` (Trụ ${selectedPillar.capacityHoles || 24} hốc)` : ''}
                   </Text>
                 </View>
               )}
@@ -491,9 +562,9 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
               <ScrollView style={{ padding: spacing.md }}>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Trạng thái:</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusStyle(selectedDetail.status).bg }]}>
-                    <Text style={[styles.statusText, { color: getStatusStyle(selectedDetail.status).txt }]}>
-                      {getStatusStyle(selectedDetail.status).label}
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusStyle(selectedDetail).bg }]}>
+                    <Text style={[styles.statusText, { color: getStatusStyle(selectedDetail).txt }]}>
+                      {getStatusStyle(selectedDetail).label}
                     </Text>
                   </View>
                 </View>
@@ -532,18 +603,36 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                   ) : null}
                 </View>
 
-                {/* Thanh toán VNPay nếu cần */}
-                {selectedDetail.paymentUrl && (
+                {/* Trạng thái thanh toán VNPay */}
+                {isRequestPaid(selectedDetail) ? (
+                  <View style={styles.paidConfirmationBox}>
+                    <CheckCircle size={18} color={colors.green[600]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.paidConfirmationTitle}>Đã hoàn tất thanh toán</Text>
+                      <Text style={styles.paidConfirmationDesc}>
+                        {(selectedDetail.amount || selectedDetail.price) ? `Chi phí phôi giống: ${formatCurrency(selectedDetail.amount || selectedDetail.price!)}. ` : ''}
+                        Khoản tiền mua giống đã được thanh toán thành công qua VNPay. Hệ thống đang chờ Quản lý nhà vườn duyệt trước khi nhân viên gieo mầm.
+                      </Text>
+                    </View>
+                  </View>
+                ) : (selectedDetail.paymentUrl && selectedDetail.status === 'PENDING') ? (
                   <TouchableOpacity
                     style={[styles.payNowBtn, { marginVertical: spacing.md, paddingVertical: 12 }]}
                     onPress={async () => {
-                      await Linking.openURL(selectedDetail.paymentUrl!);
+                      if (selectedDetail.paymentUrl) {
+                        const settled = await openAndWaitForPayment(selectedDetail.paymentUrl, bookingApi.getHistory, selectedDetail.rentalId);
+                        if (settled.status === 'success') {
+                          setPaidRequestIds(prev => new Set([...prev, selectedDetail.id]));
+                          setSelectedDetail(prev => prev ? { ...prev, isPaid: true } : null);
+                        }
+                        fetchData();
+                      }
                     }}
                   >
                     <CreditCard size={16} color={colors.white} />
                     <Text style={styles.payNowBtnText}>Tiến hành thanh toán giống rau (VNPay)</Text>
                   </TouchableOpacity>
-                )}
+                ) : null}
 
                 {/* Phản hồi nhà vườn */}
                 <Text style={styles.detailSectionHeader}>Phản hồi từ Nhà vườn:</Text>
@@ -668,7 +757,10 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                 >
                   <Text style={styles.pickerItemText}>🌱 {item.treeName || (item as any).name}</Text>
                   {item.price ? (
-                    <Text style={styles.pickerItemSub}>Giá giống: {formatCurrency(item.price)}</Text>
+                    <Text style={styles.pickerItemSub}>
+                      Giá giống: {formatCurrency(selectedPillar ? getTreePriceForPillar(item, selectedPillar) : (item.priceSmall || item.price))}
+                      {selectedPillar ? ` (Trụ ${selectedPillar.capacityHoles || 24} hốc)` : ''}
+                    </Text>
                   ) : null}
                 </TouchableOpacity>
               )}
@@ -1074,5 +1166,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.green[800],
     flex: 1,
+  },
+  paidConfirmationBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginVertical: spacing.md,
+  },
+  paidConfirmationTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.green[800],
+    marginBottom: 4,
+  },
+  paidConfirmationDesc: {
+    fontSize: 12,
+    color: colors.green[700],
+    lineHeight: 18,
   },
 });

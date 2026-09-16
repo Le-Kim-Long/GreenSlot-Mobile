@@ -19,6 +19,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { bookingApi } from '../../api/bookingApi';
+import { iotApi } from '../../api/iotApi';
+import { pumpApi } from '../../api/pumpApi';
 import type { CustomerStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
@@ -122,46 +124,95 @@ export default function IoTMonitoringScreen() {
   const [lastUpdate, setLastUpdate] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load active rentals (expand pillars list)
+  // Load active rentals / monitored pillars (expand pillars list)
   const loadRentals = useCallback(async () => {
     try {
-      const history = await bookingApi.getHistory();
-      const active = history.filter(r => r.status === 'ACTIVE');
       const options: RentedSlotOption[] = [];
-      
-      active.forEach(r => {
-        const slotId = r.slotId || r.id;
-        const pillarsList = r.pillars || [];
-        
-        if (pillarsList.length > 0) {
-          // Add each pillar as a separate option, filtering out arduino-greenhouse-01
-          pillarsList.forEach(pillar => {
-            if (pillar.pillarCode && pillar.pillarCode !== 'arduino-greenhouse-01') {
+
+      // 1. Monitored pillars (Garden Staff / Staff view)
+      try {
+        const monitored = await iotApi.getMonitoredPillars();
+        if (Array.isArray(monitored) && monitored.length > 0) {
+          monitored.forEach((p: any) => {
+            if (p.pillarCode && p.pillarCode !== 'arduino-greenhouse-01') {
+              options.push({
+                slotId: p.slotId || p.rentalId || 0,
+                slotNumber: p.slotNumber || '---',
+                locationName: p.locationName,
+                treeName: p.treeName,
+                pillarCode: p.pillarCode,
+                pillarId: p.pillarId || p.id,
+                pillarType: p.pillarType || 'Trụ Canh Tác',
+                capacityHoles: p.capacityHoles || 24,
+              });
+            }
+          });
+        }
+      } catch {}
+
+      // 2. Customer booking history (Customer view)
+      if (options.length === 0) {
+        try {
+          const history = await bookingApi.getHistory();
+          const active = (history || []).filter(r => r.status === 'ACTIVE');
+          active.forEach(r => {
+            const slotId = r.slotId || r.id;
+            const pillarsList = r.pillars || [];
+            if (pillarsList.length > 0) {
+              pillarsList.forEach(pillar => {
+                if (pillar.pillarCode && pillar.pillarCode !== 'arduino-greenhouse-01') {
+                  options.push({
+                    slotId,
+                    slotNumber: r.slotNumber,
+                    locationName: r.locationName,
+                    treeName: pillar.treeName || r.treeName,
+                    pillarCode: pillar.pillarCode,
+                    pillarId: pillar.id,
+                    pillarType: pillar.pillarType || 'Trụ Canh Tác',
+                    capacityHoles: pillar.capacityHoles || 24,
+                  });
+                }
+              });
+            } else if (r.pillarCode && r.pillarCode !== 'arduino-greenhouse-01') {
               options.push({
                 slotId,
                 slotNumber: r.slotNumber,
                 locationName: r.locationName,
-                treeName: pillar.treeName || r.treeName,
-                pillarCode: pillar.pillarCode,
-                pillarId: pillar.id,
-                pillarType: pillar.pillarType || 'Trụ Canh Tác',
-                capacityHoles: pillar.capacityHoles || 24,
+                treeName: r.treeName,
+                pillarCode: r.pillarCode,
+                pillarType: 'Trụ Canh Tác',
+                capacityHoles: 24,
               });
             }
           });
-        } else if (r.pillarCode && r.pillarCode !== 'arduino-greenhouse-01') {
-          // Fallback if pillars array is empty but pillarCode exists and is not arduino
-          options.push({
-            slotId,
-            slotNumber: r.slotNumber,
-            locationName: r.locationName,
-            treeName: r.treeName,
-            pillarCode: r.pillarCode,
-            pillarType: 'Trụ Canh Tác',
-            capacityHoles: 24,
-          });
-        }
-      });
+        } catch {}
+      }
+
+      // 3. Fallback to assigned pumps for staff
+      if (options.length === 0) {
+        try {
+          const assigned = await pumpApi.getMyAssignedPumps();
+          if (Array.isArray(assigned) && assigned.length > 0) {
+            assigned.forEach(slot => {
+              (slot.pillars || []).forEach(p => {
+                if (p.pillarCode && p.pillarCode !== 'arduino-greenhouse-01') {
+                  options.push({
+                    slotId: slot.slotId,
+                    slotNumber: slot.slotNumber,
+                    locationName: slot.locationName,
+                    treeName: slot.treeName,
+                    pillarCode: p.pillarCode,
+                    pillarId: p.pillarId,
+                    pillarType: 'Trụ Canh Tác',
+                    capacityHoles: 24,
+                  });
+                }
+              });
+            });
+          }
+        } catch {}
+      }
+
       setRentals(options);
     } catch {
       setRentals([]);
@@ -207,8 +258,8 @@ export default function IoTMonitoringScreen() {
   if (rentals.length === 0) {
     return (
       <EmptyState
-        title='Chưa có ô vườn đang thuê'
-        subtitle='Bạn cần ít nhất một hợp đồng thuê đang hoạt động để giám sát IoT.'
+        title='Chưa có dữ liệu trụ IoT'
+        subtitle='Hiện tại chưa có trụ hoặc ô đất nào được kết nối với thiết bị cảm biến IoT.'
       />
     );
   }
