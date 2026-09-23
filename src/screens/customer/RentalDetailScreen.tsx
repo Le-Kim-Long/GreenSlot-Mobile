@@ -140,14 +140,52 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
   const currentEndDate = useMemo(() => parseToDate(rental.endDate), [rental.endDate]);
   const newEndDate = useMemo(() => addMonthsToDate(currentEndDate, selectedMonths), [currentEndDate, selectedMonths]);
-  const pricePerMonth = useMemo(() => rental.monthlyPrice ?? rental.totalPrice / Math.max(1,
-    (() => {
-      const start = parseToDate(rental.startDate);
-      const end = parseToDate(rental.endDate);
-      const diffMs = end.getTime() - start.getTime();
-      return Math.max(1, Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)));
-    })()
-  ), [rental.monthlyPrice, rental.totalPrice, rental.startDate, rental.endDate]);
+  const pricePerMonth = useMemo(() => {
+    // 1. Ưu tiên lấy từ giao dịch EXT_ đã tồn tại (amount / months do chính BE tính)
+    const extTx = rental.transactions?.find(t => t.vnpTxnRef?.startsWith('EXT_'));
+    if (extTx) {
+      const parts = extTx.vnpTxnRef?.split('_') ?? [];
+      const extMonths = parts.length >= 3 ? Number(parts[2]) : 0;
+      const extAmount = Number(extTx.amount);
+      if (extMonths > 0 && extAmount > 0) {
+        return Math.round(extAmount / extMonths);
+      }
+    }
+
+    // 2. Dùng monthlyPrice từ adapter (đã tính đất + trụ chuẩn xác)
+    if (rental.monthlyPrice && rental.monthlyPrice > 0) {
+      return rental.monthlyPrice;
+    }
+
+    // 3. Tự tính trực tiếp theo công thức chuẩn: giá đất + giá các trụ (Small 150k, Medium 200k, Large 300k)
+    const landPrice = rental.monthlyPrice ?? 0;
+    let pillarsPrice = 0;
+    if (rental.pillars && rental.pillars.length > 0) {
+      pillarsPrice = rental.pillars.reduce((sum, p) => {
+        if (p.price != null && p.price > 0) return sum + p.price;
+        const code = (p.pillarCode || '').toUpperCase();
+        const type = (p.pillarType || '').toUpperCase();
+        if (type === 'SMALL' || code.includes('-S')) return sum + 150000;
+        if (type === 'LARGE' || code.includes('-L')) return sum + 300000;
+        return sum + 200000;
+      }, 0);
+    } else {
+      const pCount = rental.pillarCodes?.length || (rental.pillarCode ? 1 : 0);
+      pillarsPrice = pCount * 200000;
+    }
+    const computed = landPrice + pillarsPrice;
+    if (computed > 0) return computed;
+
+    // 4. Fallback cuối cùng
+    return Math.round(rental.totalPrice / Math.max(1,
+      (() => {
+        const start = parseToDate(rental.startDate);
+        const end = parseToDate(rental.endDate);
+        const diffMs = end.getTime() - start.getTime();
+        return Math.max(1, Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)));
+      })()
+    ));
+  }, [rental.monthlyPrice, rental.totalPrice, rental.startDate, rental.endDate, rental.transactions, rental.pillars, rental.pillarCodes, rental.pillarCode]);
   const extensionCost = pricePerMonth * selectedMonths;
 
   // ── Incident report state ────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   Modal,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {
   CreditCard,
@@ -32,7 +33,9 @@ import * as WebBrowser from 'expo-web-browser';
 import { bookingApi } from '../../api/bookingApi';
 import { apiClient, resolveApiBaseUrl } from '../../api/client';
 import type { PaymentTransactionInfo, PillarDetail } from '../../types/api';
+import type { CustomerStackProps } from '../../navigation/types';
 import { formatCurrency } from '../../utils/bookingAdapter';
+import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
 import { Badge, statusToBadge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
@@ -223,12 +226,13 @@ function ItemizedBreakdown({ txn }: { txn: PaymentItem }) {
   );
 }
 
-export default function PaymentHistoryScreen() {
+export default function PaymentHistoryScreen({ navigation }: Partial<CustomerStackProps<'PaymentHistory'>>) {
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterKind>('ALL');
   const [selectedTxn, setSelectedTxn] = useState<PaymentItem | null>(null);
+  const [repayingId, setRepayingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -295,6 +299,66 @@ export default function PaymentHistoryScreen() {
       await WebBrowser.openBrowserAsync(invoiceUrl);
     } catch {
       Alert.alert('Thông báo', 'Không thể mở hóa đơn PDF trên trình duyệt.');
+    }
+  };
+
+  const handleRepay = (txn: PaymentItem) => {
+    Alert.alert(
+      'Tiếp tục thanh toán',
+      `Bạn có muốn tiếp tục thanh toán cho ${
+        txn.kind === 'EXTEND'
+          ? `gia hạn thêm ${txn.extendedMonths || 1} tháng ô ${txn.slotNumber}`
+          : txn.kind === 'PLANT'
+          ? `mua giống rau ô ${txn.slotNumber}`
+          : `hợp đồng thuê ô ${txn.slotNumber}`
+      }?\nSố tiền: ${formatCurrency(txn.amount)}`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Thanh toán VNPay',
+          onPress: () => doRepay(txn),
+        },
+      ]
+    );
+  };
+
+  const doRepay = async (txn: PaymentItem) => {
+    setRepayingId(txn.id);
+    try {
+      let result: { paymentUrl?: string; rentalId?: number } | undefined;
+      if (txn.kind === 'EXTEND') {
+        result = await bookingApi.extendBooking({
+          rentalId: txn.rentalId,
+          durationInMonths: txn.extendedMonths || 1,
+          isMobile: true,
+          mobileRedirectUrl: getMobileRedirectUrl(),
+        });
+      } else {
+        result = await bookingApi.repayBooking(txn.rentalId);
+      }
+
+      if (result?.paymentUrl) {
+        setSelectedTxn(null);
+        const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, txn.rentalId);
+        const callback = 'callback' in settled ? settled.callback : undefined;
+        await load();
+        if (settled.status === 'success') {
+          navigation?.navigate?.('PaymentResult', {
+            status: 'success',
+            rentalId: txn.rentalId,
+            slotNumber: txn.slotNumber,
+            amount: callback?.amount,
+            txnRef: callback?.txnRef,
+            orderInfo: callback?.orderInfo,
+          });
+        }
+      } else {
+        Alert.alert('Thông báo', 'Không thể tạo liên kết thanh toán. Vui lòng thử lại sau.');
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể lấy link thanh toán. Vui lòng thử lại.');
+    } finally {
+      setRepayingId(null);
     }
   };
 
@@ -406,7 +470,28 @@ export default function PaymentHistoryScreen() {
                 <View style={styles.right}>
                   <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
                   <Badge label={badge.label} variant={badge.variant} />
-                  <Text style={styles.viewDetail}>Xem chi tiết →</Text>
+                  {item.status === 'PENDING' ? (
+                    <TouchableOpacity
+                      style={styles.cardPayBtn}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        handleRepay(item);
+                      }}
+                      disabled={repayingId === item.id}
+                      activeOpacity={0.8}
+                    >
+                      {repayingId === item.id ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <>
+                          <CreditCard size={11} color={colors.white} />
+                          <Text style={styles.cardPayBtnText}>Thanh toán</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.viewDetail}>Xem chi tiết →</Text>
+                  )}
                 </View>
               </View>
             </TouchableOpacity>
@@ -581,21 +666,40 @@ export default function PaymentHistoryScreen() {
 
               {/* Modal Footer */}
               <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.downloadBtn}
-                  onPress={() => handleDownloadInvoice(selectedTxn)}
-                >
-                  <Download size={16} color={colors.white} />
-                  <Text style={styles.downloadBtnText}>Tải PDF hóa đơn</Text>
-                </TouchableOpacity>
+                {selectedTxn.status === 'PENDING' ? (
+                  <TouchableOpacity
+                    style={styles.modalRepayBtn}
+                    onPress={() => handleRepay(selectedTxn)}
+                    disabled={repayingId === selectedTxn.id}
+                  >
+                    {repayingId === selectedTxn.id ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <>
+                        <CreditCard size={15} color={colors.white} />
+                        <Text style={styles.modalRepayBtnText}>Tiếp tục thanh toán VNPay</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.downloadBtn}
+                      onPress={() => handleDownloadInvoice(selectedTxn)}
+                    >
+                      <Download size={16} color={colors.white} />
+                      <Text style={styles.downloadBtnText}>Tải PDF hóa đơn</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.printBtn}
-                  onPress={() => WebBrowser.openBrowserAsync(`${apiClient.defaults.baseURL?.replace(/\/$/, '') || resolveApiBaseUrl()}/invoices/payment/${selectedTxn.id}`)}
-                >
-                  <Printer size={15} color={colors.gray[700]} />
-                  <Text style={styles.printBtnText}>In hóa đơn</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.printBtn}
+                      onPress={() => WebBrowser.openBrowserAsync(`${apiClient.defaults.baseURL?.replace(/\/$/, '') || resolveApiBaseUrl()}/invoices/payment/${selectedTxn.id}`)}
+                    >
+                      <Printer size={15} color={colors.gray[700]} />
+                      <Text style={styles.printBtnText}>In hóa đơn</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
 
                 <TouchableOpacity
                   style={styles.closeModalBtn}
@@ -929,4 +1033,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   closeModalBtnText: { color: colors.gray[800], fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  cardPayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.green[600],
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  cardPayBtnText: {
+    color: colors.white,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  modalRepayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.green[600],
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    flex: 2,
+    justifyContent: 'center',
+  },
+  modalRepayBtnText: {
+    color: colors.white,
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+  },
 });

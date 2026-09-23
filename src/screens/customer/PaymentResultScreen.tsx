@@ -119,6 +119,8 @@ export default function PaymentResultScreen({
   }, [opacityAnim, scaleAnim, slideAnim]);
 
   useEffect(() => {
+    if (!isSuccess) return;
+
     const interval = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
@@ -138,7 +140,7 @@ export default function PaymentResultScreen({
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isSuccess]);
 
   const goToRentals = () => {
     if (isTreePayment) {
@@ -208,19 +210,27 @@ export default function PaymentResultScreen({
             </View>
           )}
 
-          <Text style={styles.countdown}>
-            Tự động chuyển sau{' '}
-            <Text style={{ color: config.buttonColor, fontFamily: 'Inter_700Bold' }}>
-              {countdown}s
+          {isSuccess && (
+            <Text style={styles.countdown}>
+              Tự động chuyển sau{' '}
+              <Text style={{ color: config.buttonColor, fontFamily: 'Inter_700Bold' }}>
+                {countdown}s
+              </Text>
             </Text>
-          </Text>
+          )}
         </Animated.View>
 
         {/* CTA Button */}
         <Animated.View style={{ opacity: opacityAnim, width: '100%' }}>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: config.buttonColor }]}
-            onPress={goToRentals}
+            onPress={() => {
+              if (!isSuccess && navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                goToRentals();
+              }
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.buttonText}>{displayButtonLabel}</Text>

@@ -217,7 +217,10 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
   const totalHoles = (smallCount * 24) + (mediumCount * 36) + (largeCount * 48);
 
   const pillarsMonthlyPrice = (smallCount * 150000) + (mediumCount * 200000) + (largeCount * 300000);
-  const slotRentalCost = pillarsMonthlyPrice * selectedMonths;
+  // Giống hệt FE: lấy giá thuê đất từ landPrice (hoặc fallback price) do backend trả về
+  const landPrice = Number(slot?.landPrice != null ? slot.landPrice : (slot?.price || 0));
+  const monthlyRent = landPrice + pillarsMonthlyPrice;
+  const slotRentalCost = monthlyRent * selectedMonths;
 
   // Generate Chosen Pillars List: SMALL -> MEDIUM -> LARGE
   const chosenPillars = useMemo<ChosenPillarItem[]>(() => {
@@ -755,7 +758,19 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
                   {largeCount > 0 && <Text style={styles.billSub}>• {largeCount}x Trụ Lớn (48 hốc): 300k/th</Text>}
                 </View>
                 <Text style={styles.billValue}>
-                  {formatCurrency(pillarsMonthlyPrice)} x {selectedMonths}th = {formatCurrency(slotRentalCost)}
+                  {formatCurrency(pillarsMonthlyPrice)} x {selectedMonths}th = {formatCurrency(pillarsMonthlyPrice * selectedMonths)}
+                </Text>
+              </View>
+            )}
+
+            {/* Land Price Item - chỉ hiển thị nếu có phí thuê đất (giống FE) */}
+            {landPrice > 0 && (
+              <View style={styles.billRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.billLabel}>📍 Phí thuê đất ({slotArea.toFixed(1)} m²):</Text>
+                </View>
+                <Text style={styles.billValue}>
+                  {formatCurrency(landPrice)} x {selectedMonths}th = {formatCurrency(landPrice * selectedMonths)}
                 </Text>
               </View>
             )}

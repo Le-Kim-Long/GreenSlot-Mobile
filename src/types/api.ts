@@ -94,6 +94,8 @@ export interface AvailableSlotResponseDTO {
   id: number;
   slotNumber: string;
   price: number;
+  /** Giá thuê đất thuần (không bao gồm trụ). Backend trả field landPrice. */
+  landPrice?: number;
   area?: number;
   maxPillars?: number;
   status: string;
