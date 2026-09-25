@@ -150,6 +150,7 @@ export function CustomAlertModal({
   const validButtons = buttons.length > 0 ? buttons : [{ text: 'Đồng ý', style: 'default' as const }];
   const isSingleButton = validButtons.length === 1;
   const isTwoButtons = validButtons.length === 2;
+  const hasCancelInTwo = isTwoButtons && validButtons.some(b => b.style === 'cancel');
 
   return (
     <Modal
@@ -221,19 +222,29 @@ export function CustomAlertModal({
                     textStyle = styles.destructiveBtnText;
                   }
 
+                  const twoBtnFlex = hasCancelInTwo
+                    ? isCancel
+                      ? styles.twoButtonsCancel
+                      : styles.twoButtonsConfirm
+                    : styles.flexButton;
+
                   return (
                     <TouchableOpacity
                       key={`alert-btn-${index}`}
                       style={[
                         styles.baseBtn,
                         btnStyle,
-                        isTwoButtons && styles.flexButton,
+                        isTwoButtons && twoBtnFlex,
                         !isSingleButton && !isTwoButtons && { width: '100%' },
                       ]}
                       onPress={() => handleButtonPress(btn)}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.baseBtnText, textStyle]}>
+                      <Text
+                        style={[styles.baseBtnText, textStyle]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
                         {btn.text || 'Đồng ý'}
                       </Text>
                     </TouchableOpacity>
@@ -257,10 +268,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   card: {
-    width: Math.min(width - 48, 380),
+    width: Math.min(width - 36, 390),
     backgroundColor: colors.white,
     borderRadius: 24,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 18,
     paddingTop: spacing.xl + 4,
     paddingBottom: spacing.lg,
     alignItems: 'center',
@@ -314,7 +325,7 @@ const styles = StyleSheet.create({
   },
   twoButtonsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 10,
     justifyContent: 'space-between',
   },
   stackedButtons: {
@@ -324,16 +335,23 @@ const styles = StyleSheet.create({
   flexButton: {
     flex: 1,
   },
+  twoButtonsCancel: {
+    flex: 0.75,
+    minWidth: 70,
+  },
+  twoButtonsConfirm: {
+    flex: 1.35,
+  },
   baseBtn: {
     minHeight: 46,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 8,
   },
   baseBtnText: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+    fontSize: 14.5,
   },
   defaultBtn: {
     backgroundColor: colors.green[600],

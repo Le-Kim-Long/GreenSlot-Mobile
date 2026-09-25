@@ -38,62 +38,24 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     ? paidTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
     : (Number(latestTx?.amount) || 0);
 
-  // Tính monthlyPrice chuẩn xác khớp 100% với Backend khi gia hạn:
-  // BE tính: monthlyRent = landPrice (giá đất = slot.getPrice()) + tổng giá các trụ (Small 150k, Medium 200k, Large 300k).
-  // 1. Ưu tiên lấy từ giao dịch EXT_ nếu đã tồn tại (amount / months do chính BE sinh ra):
-  const extTx = dto.transactions?.find(t => t.vnpTxnRef?.startsWith('EXT_'));
-  let exactMonthlyPrice: number | null = null;
-  if (extTx) {
-    const parts = extTx.vnpTxnRef?.split('_') ?? [];
-    const extMonths = parts.length >= 3 ? Number(parts[2]) : 0;
-    const extAmount = Number(extTx.amount);
-    if (extMonths > 0 && extAmount > 0) {
-      exactMonthlyPrice = Math.round(extAmount / extMonths);
+  let computedStatus = dto.rentalStatus;
+  if (computedStatus === 'ACTIVE' && dto.endTime) {
+    const isExpired = new Date(dto.endTime) < new Date();
+    if (isExpired) {
+      computedStatus = 'EXPIRED';
     }
   }
 
-  // 2. Nếu chưa có giao dịch EXT_, tính theo đúng công thức Backend:
-  // BE trả dto.monthlyPrice = slot.getPrice() (giá thuê đất).
-  if (!exactMonthlyPrice) {
-    const landPrice = Number(dto.monthlyPrice) || 0;
-    let pillarsPrice = 0;
-    if (dto.pillars && dto.pillars.length > 0) {
-      pillarsPrice = dto.pillars.reduce((sum, p) => {
-        if (p.price != null && p.price > 0) return sum + p.price;
-        const code = (p.pillarCode || '').toUpperCase();
-        const type = (p.pillarType || '').toUpperCase();
-        if (type === 'SMALL' || code.includes('-S')) return sum + 150000;
-        if (type === 'LARGE' || code.includes('-L')) return sum + 300000;
-        return sum + 200000; // Medium / Mặc định
-      }, 0);
-    } else {
-      const pCount = dto.pillarCodes?.length || (dto.pillarCode ? 1 : 0);
-      pillarsPrice = pCount * 200000;
-    }
-    const computedRent = landPrice + pillarsPrice;
-    if (computedRent > 0) {
-      exactMonthlyPrice = computedRent;
-    }
-  }
-
-  // 3. Fallback: tính từ BOOK_ tx / durationMonths (trừ tiền giống cây nếu có)
-  if (!exactMonthlyPrice || exactMonthlyPrice <= 0) {
-    const bookingTx = dto.transactions?.find(t => t.vnpTxnRef?.startsWith('BOOK_'));
-    const durationMonths = (() => {
-      if (!dto.startTime || !dto.endTime) return 1;
-      const start = new Date(dto.startTime);
-      const end = new Date(dto.endTime);
-      const diff =
-        (end.getFullYear() - start.getFullYear()) * 12 +
-        (end.getMonth() - start.getMonth());
-      return Math.max(1, diff);
-    })();
-    exactMonthlyPrice = bookingTx
-      ? Math.round(Number(bookingTx.amount) / durationMonths)
-      : (dto.monthlyPrice ?? 0);
-  }
-
-  const monthlyPrice = exactMonthlyPrice;
+  // Compute monthlyPrice đồng nhất với FE: fallback to initial transaction / duration
+  const initialBookingTx = dto.transactions?.find(t => t.vnpTxnRef?.startsWith('BOOK_')) ?? dto.transactions?.[0];
+  const durationMonths = (() => {
+    if (!dto.startTime || !dto.endTime) return 1;
+    const start = new Date(dto.startTime);
+    const end = new Date(dto.endTime);
+    const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    return Math.max(1, diffMonths);
+  })();
+  const monthlyPrice = dto.monthlyPrice || (initialBookingTx ? Math.round(Number(initialBookingTx.amount) / durationMonths) : 0);
 
   return {
     id: dto.rentalId,
@@ -101,7 +63,10 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     slotNumber: dto.slotNumber,
     pillarCode: dto.pillarCode,
     pillarCodes: dto.pillarCodes,
-    pillars: dto.pillars,
+    pillars: dto.pillars?.map(p => ({
+      ...p,
+      price: p.monthlyPrice ?? p.price,
+    })),
     locationName: dto.locationName,
     locationAddress: dto.locationAddress,
     startDate: formatDate(dto.startTime),
@@ -110,7 +75,10 @@ export function mapRentalHistory(dto: RentalHistoryDTO): BookingHistory {
     endTime: dto.endTime,
     totalPrice,
     monthlyPrice,
-    status: dto.rentalStatus,
+    landPrice: dto.landPrice,
+    monthlyPillarsPrice: dto.monthlyPillarsPrice,
+    slotArea: dto.slotArea,
+    status: computedStatus,
     paymentStatus: paidTx?.status || latestTx?.status,
     treeId: dto.treeId,
     treeName: dto.treeName,

@@ -370,6 +370,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
                 const callback = 'callback' in settled ? settled.callback : undefined;
                 navigation.replace('PaymentResult', {
                   status: settled.status,
+                  type: 'rental',
                   rentalId: result.rentalId,
                   slotNumber: slot.slotNumber,
                   amount: callback?.amount,

@@ -6,7 +6,9 @@ import {
   Clock,
   CreditCard,
   Info,
+  Layers,
   Leaf,
+  RotateCcw,
   Sprout,
   Wrench,
   XCircle
@@ -26,7 +28,7 @@ export const CATEGORY_TABS: CategoryTab[] = [
   { key: 'UNREAD', label: 'Chưa đọc' },
   { key: 'IOT', label: 'Cảnh báo IoT' },
   { key: 'CARE_HARVEST', label: 'Chăm sóc & Thu hoạch' },
-  { key: 'CONTRACT', label: 'Hợp đồng' },
+  { key: 'CONTRACT', label: 'Hợp đồng & Thanh toán' },
 ];
 
 export function filterNotificationByCategory(
@@ -107,8 +109,83 @@ export interface NotificationMeta {
   badgeBg: string;
 }
 
-export function getNotificationMeta(type: string): NotificationMeta {
+export function getNotificationMeta(type: string, title?: string, message?: string): NotificationMeta {
   const t = (type || '').toUpperCase();
+  const lowerTitle = (title || '').toLowerCase();
+  const lowerMsg = (message || '').toLowerCase();
+
+  // Payment Events
+  if (t === 'PAYMENT_SUCCESS' || t === 'BOOKING_SUCCESS') {
+    // 1. Check tree planting / seed payment FIRST
+    if (
+      lowerTitle.includes('giống') ||
+      lowerTitle.includes('phôi giống') ||
+      lowerTitle.includes('cây trồng') ||
+      lowerTitle.includes('trồng cây') ||
+      lowerMsg.includes('tiền giống') ||
+      lowerMsg.includes('giống rau') ||
+      lowerMsg.includes('mua giống')
+    ) {
+      return {
+        icon: Sprout,
+        color: colors.green[600],
+        bgColor: colors.green[50],
+        badgeLabel: 'Thanh toán giống rau',
+        badgeColor: colors.green[800],
+        badgeBg: colors.green[100],
+      };
+    }
+
+    // 2. Extension
+    if (lowerTitle.includes('gia hạn') || lowerMsg.includes('gia hạn')) {
+      return {
+        icon: RotateCcw,
+        color: colors.blue[600],
+        bgColor: colors.blue[50],
+        badgeLabel: 'Gia hạn thành công',
+        badgeColor: colors.blue[800],
+        badgeBg: colors.blue[100],
+      };
+    }
+
+    // 3. Add Pillar
+    if (
+      lowerTitle.includes('thuê thêm trụ') ||
+      lowerTitle.includes('bổ sung trụ') ||
+      lowerTitle.includes('thuê trụ') ||
+      lowerMsg.includes('thuê bổ sung') ||
+      lowerMsg.includes('thuê thêm trụ')
+    ) {
+      return {
+        icon: Layers,
+        color: colors.emerald[600],
+        bgColor: colors.emerald[50],
+        badgeLabel: 'Thuê trụ thành công',
+        badgeColor: colors.emerald[800],
+        badgeBg: colors.emerald[100],
+      };
+    }
+
+    return {
+      icon: CreditCard,
+      color: colors.green[600],
+      bgColor: colors.green[50],
+      badgeLabel: 'Thanh toán thành công',
+      badgeColor: colors.green[800],
+      badgeBg: colors.green[100],
+    };
+  }
+
+  if (t === 'PAYMENT_FAILED') {
+    return {
+      icon: XCircle,
+      color: colors.red[600],
+      bgColor: colors.red[100],
+      badgeLabel: 'Thanh toán thất bại',
+      badgeColor: colors.red[800],
+      badgeBg: colors.red[100],
+    };
+  }
 
   // Task Events
   if (t === 'TASK_ASSIGNED' || t === 'TASK_ASSIGNMENT') {
@@ -196,17 +273,7 @@ export function getNotificationMeta(type: string): NotificationMeta {
     };
   }
 
-  // Booking & Rental Expiration
-  if (t === 'BOOKING_SUCCESS') {
-    return {
-      icon: CreditCard,
-      color: colors.green[600],
-      bgColor: colors.green[50],
-      badgeLabel: 'Thanh toán thành công',
-      badgeColor: colors.green[800],
-      badgeBg: colors.green[100],
-    };
-  }
+  // Rental Expiration
   if (t === 'RENTAL_EXPIRING_7D' || t === 'RENTAL_EXPIRING_3D' || t === 'RENTAL_EXPIRING_1D') {
     return {
       icon: Clock,
@@ -251,29 +318,128 @@ export function getNotificationMeta(type: string): NotificationMeta {
   };
 }
 
+export function extractSlotNumberFromNotification(notification: NotificationResponseDTO): string | undefined {
+  const text = `${notification.title || ''} ${notification.message || ''}`;
+  const match = text.match(/(?:ô\s*vườn|tại\s*ô|ô)\s*([A-Za-z0-9_-]+)/i);
+  return match ? match[1] : undefined;
+}
+
 export function getNotificationActionRoute(notification: NotificationResponseDTO): {
   screen: string;
   params?: any;
 } | null {
   const t = (notification.type || '').toUpperCase();
+  const title = (notification.title || '').toLowerCase();
+  const msg = (notification.message || '').toLowerCase();
+  const slotNumber = extractSlotNumberFromNotification(notification);
+  const rentalId = notification.referenceId ?? undefined;
 
+  // 1. IoT & Sensor Alerts
   if (t.includes('IOT') || t.includes('ALERT') || t.includes('SENSOR')) {
     return { screen: 'IoTMonitoring' };
   }
 
+  // 2. Successful Payments & Booking:
+  if (t === 'PAYMENT_SUCCESS' || t === 'BOOKING_SUCCESS') {
+    // 2a. Tree planting payment (check first to avoid conflict with pillar text in message)
+    if (
+      title.includes('giống') ||
+      title.includes('phôi giống') ||
+      title.includes('cây trồng') ||
+      title.includes('trồng cây') ||
+      msg.includes('tiền giống') ||
+      msg.includes('giống rau') ||
+      msg.includes('mua giống')
+    ) {
+      const treeMatch = (notification.message || '').match(/giống\s+(?:rau\s+)?([^tạivào(]+?)(?:\s+tại|\s+vào|\s+ở|\s*\()/i);
+      const treeName = treeMatch ? treeMatch[1].trim() : undefined;
+      return {
+        screen: 'CustomerTreePlanting',
+        params: {
+          requestId: notification.referenceId ?? undefined,
+          slotNumber,
+          treeName,
+          autoOpenDetail: true,
+        },
+      };
+    }
+
+    // 2b. Add Pillar
+    if (
+      title.includes('thuê thêm trụ') ||
+      title.includes('bổ sung trụ') ||
+      title.includes('thuê trụ') ||
+      msg.includes('thuê bổ sung') ||
+      msg.includes('thuê thêm trụ')
+    ) {
+      return {
+        screen: 'RentalDetail',
+        params: { slotNumber, rentalId },
+      };
+    }
+
+    // 2c. Extension
+    if (title.includes('gia hạn') || msg.includes('gia hạn')) {
+      return {
+        screen: 'RentalDetail',
+        params: { slotNumber, rentalId },
+      };
+    }
+
+    // 2d. New booking / garden rental payment
+    return {
+      screen: 'RentalDetail',
+      params: { slotNumber, rentalId },
+    };
+  }
+
+  // 3. Tree Planting Requests (non-payment events)
   if (t.startsWith('PLANTING_')) {
-    return { screen: 'CustomerTreePlanting' };
+    const treeMatch = (notification.message || '').match(/giống\s+(?:rau\s+)?([^tạivào(]+?)(?:\s+tại|\s+vào|\s+ở|\s*\()/i);
+    const treeName = treeMatch ? treeMatch[1].trim() : undefined;
+    return {
+      screen: 'CustomerTreePlanting',
+      params: {
+        requestId: notification.referenceId ?? undefined,
+        slotNumber,
+        treeName,
+        autoOpenDetail: true,
+      },
+    };
   }
 
-  if (t.startsWith('TASK_') || t.startsWith('HARVEST_')) {
-    return { screen: 'CareServices' };
-  }
-
-  if (t === 'BOOKING_SUCCESS') {
+  // 4. Failed Payments
+  if (t === 'PAYMENT_FAILED') {
+    if (title.includes('giống') || msg.includes('giống')) {
+      return { screen: 'CustomerTreePlanting' };
+    }
     return { screen: 'PaymentHistory' };
   }
 
+  // 5. Harvest Events
+  if (t.startsWith('HARVEST_')) {
+    return { screen: 'CustomerHarvestHistory' };
+  }
+
+  // 6. Gardening Tasks
+  if (t.startsWith('TASK_')) {
+    if (slotNumber || rentalId) {
+      return {
+        screen: 'RentalDetail',
+        params: { slotNumber, rentalId },
+      };
+    }
+    return { screen: 'Rentals' };
+  }
+
+  // 7. Rental Events (expiring, etc.)
   if (t.startsWith('RENTAL_')) {
+    if (slotNumber || rentalId) {
+      return {
+        screen: 'RentalDetail',
+        params: { slotNumber, rentalId },
+      };
+    }
     return { screen: 'Rentals' };
   }
 

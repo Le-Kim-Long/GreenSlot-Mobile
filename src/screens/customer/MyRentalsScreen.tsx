@@ -30,6 +30,8 @@ import {
   CalendarCheck2,
   Building2,
   MapPin,
+  Layers,
+  PlusCircle,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -43,6 +45,8 @@ import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerTabProps } from '../../navigation/types';
 import { openAndWaitForPayment } from '../../utils/paymentFlow';
+import { AddPillarsModal } from '../../components/customer/AddPillarsModal';
+import { ExtendRentalModal } from '../../components/customer/ExtendRentalModal';
 
 type TabKey = 'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'COMPLETED';
 
@@ -257,6 +261,8 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [repayingId, setRepayingId] = useState<number | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [incidentTarget, setIncidentTarget] = useState<BookingHistory | null>(null);
+  const [addPillarsTarget, setAddPillarsTarget] = useState<BookingHistory | null>(null);
+  const [extendTarget, setExtendTarget] = useState<BookingHistory | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -267,6 +273,26 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
     }
   }, []);
 
+  const handlePaymentSettled = async (
+    status: 'success' | 'failed' | 'pending',
+    callback: any,
+    rentalId: number
+  ) => {
+    await load();
+    const type = addPillarsTarget ? 'add_pillar' : extendTarget ? 'extend' : 'rental';
+    const rental = rentals.find(r => r.id === rentalId) || addPillarsTarget || extendTarget;
+    navigation.navigate('PaymentResult', {
+      status,
+      type,
+      rentalId,
+      rental: rental || undefined,
+      slotNumber: rental?.slotNumber,
+      amount: callback?.amount,
+      txnRef: callback?.txnRef,
+      orderInfo: callback?.orderInfo,
+    });
+  };
+
   useFocusEffect(
     useCallback(() => {
       load().finally(() => setLoading(false));
@@ -275,7 +301,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         .catch(() =>
           notificationApi.getMyNotifications().then(list => {
             if (Array.isArray(list)) setUnreadCount(list.filter(n => !n.isRead).length);
-          }).catch(() => {})
+          }).catch(() => { })
         );
     }, [load])
   );
@@ -355,7 +381,9 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         await load();
         navigation.replace('PaymentResult', {
           status: settled.status,
+          type: 'rental',
           rentalId: rental.id,
+          rental,
           slotNumber: rental.slotNumber,
           amount: callback?.amount,
           txnRef: callback?.txnRef,
@@ -436,6 +464,15 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
           const isActive = item.status === 'ACTIVE';
           const isRepaying = repayingId === item.id;
           const hasPillars = item.pillars && item.pillars.length > 0;
+          const slotArea = item.slotArea || 10.0;
+          let currentUsedArea = (item.pillars || []).reduce((sum, p) => {
+            const req = p.requiredArea || (p.capacityHoles && p.capacityHoles >= 48 ? 2.0 : (p.capacityHoles && p.capacityHoles >= 36 ? 1.5 : 1.0));
+            return sum + req;
+          }, 0);
+          if (currentUsedArea === 0 && item.pillarCode && item.pillarCode !== 'N/A' && item.pillarCode !== 'arduino-greenhouse-01') {
+            currentUsedArea = 1.0;
+          }
+          const availableArea = Math.max(0, Number((slotArea - currentUsedArea).toFixed(1)));
 
           return (
             <TouchableOpacity
@@ -465,17 +502,20 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                     <Text style={styles.cardSub} numberOfLines={1}>{item.locationName}</Text>
                   </View>
 
-                  {/* Cây trồng / Trụ */}
+                  {/* Cây trồng / Trụ — hiện tối đa 1 trụ + badge số dư */}
                   {hasPillars ? (
                     <View style={styles.pillarsRow}>
-                      {item.pillars!.map((p, idx) => (
-                        <View key={idx} style={styles.pillarBadge}>
-                          <Text style={styles.pillarBadgeText}>
-                            🌱 {p.pillarCode}
-                            {p.treeName ? ` · ${p.treeName}` : ''}
-                          </Text>
+                      <View style={styles.pillarBadge}>
+                        <Text style={styles.pillarBadgeText} numberOfLines={1}>
+                          🌱 {item.pillars![0].pillarCode}
+                          {item.pillars![0].treeName ? ` · ${item.pillars![0].treeName}` : ''}
+                        </Text>
+                      </View>
+                      {item.pillars!.length > 1 && (
+                        <View style={styles.pillarMoreBadge}>
+                          <Text style={styles.pillarMoreText}>+{item.pillars!.length - 1}</Text>
                         </View>
-                      ))}
+                      )}
                     </View>
                   ) : item.treeName ? (
                     <Text style={styles.cardTree}>🌱 {item.treeName}</Text>
@@ -495,6 +535,17 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                   <Badge label={badge.label} variant={badge.variant} />
                   <Text style={styles.cardPrice}>{formatCurrency(item.totalPrice)}</Text>
                 </View>
+              </View>
+
+              {/* ── Thông tin diện tích ô vườn (Full width, không bị cắt) ── */}
+              <View style={styles.areaRow}>
+                <Layers size={13} color={colors.green[600]} />
+                <Text style={styles.areaText}>
+                  Ô: <Text style={styles.areaBold}>{slotArea}m²</Text> · Dùng: <Text style={styles.areaBold}>{currentUsedArea.toFixed(1)}m²</Text> · Trống:{' '}
+                  <Text style={[styles.areaBold, availableArea >= 1.0 ? { color: colors.emerald[700] } : { color: colors.orange[600] }]}>
+                    {availableArea.toFixed(1)}m²
+                  </Text>
+                </Text>
               </View>
 
               {/* ── Harvest Progress (chỉ hiện khi ACTIVE) ── */}
@@ -533,8 +584,26 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                       navigation.navigate('CustomerTreePlanting', { rentalId: item.id } as any);
                     }}
                   >
-                    <Sprout size={14} color={colors.green[700]} />
+                    <Sprout size={13} color={colors.green[700]} />
                     <Text style={styles.btnPlantText}>Trồng mới</Text>
+                  </TouchableOpacity>
+
+                  {/* Thuê thêm trụ */}
+                  <TouchableOpacity
+                    style={[styles.btnAddPillars, availableArea < 1.0 && styles.btnAddPillarsDisabled]}
+                    onPress={e => {
+                      e.stopPropagation?.();
+                      if (availableArea < 1.0) {
+                        Alert.alert('Thông báo', 'Ô vườn đã hết diện tích trống để đặt thêm trụ.');
+                        return;
+                      }
+                      setAddPillarsTarget(item);
+                    }}
+                  >
+                    <PlusCircle size={13} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
+                    <Text style={[styles.btnAddPillarsText, availableArea < 1.0 && { color: colors.gray[400] }]}>
+                      Thuê trụ
+                    </Text>
                   </TouchableOpacity>
 
                   {/* Gia hạn */}
@@ -542,23 +611,11 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                     style={styles.btnExtend}
                     onPress={e => {
                       e.stopPropagation?.();
-                      navigation.navigate('RentalDetail', { rental: item });
+                      setExtendTarget(item);
                     }}
                   >
-                    <RotateCw size={14} color="#1d4ed8" />
+                    <RotateCw size={13} color="#1d4ed8" />
                     <Text style={styles.btnExtendText}>Gia hạn</Text>
-                  </TouchableOpacity>
-
-                  {/* Báo cáo sự cố */}
-                  <TouchableOpacity
-                    style={styles.btnIncident}
-                    onPress={e => {
-                      e.stopPropagation?.();
-                      setIncidentTarget(item);
-                    }}
-                  >
-                    <TriangleAlert size={14} color="#dc2626" />
-                    <Text style={styles.btnIncidentText}>Sự cố</Text>
                   </TouchableOpacity>
 
                   {/* Xem chi tiết */}
@@ -591,6 +648,22 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
           setIncidentTarget(null);
           load();
         }}
+      />
+
+      {/* ─── Add Pillars Modal ────────────────────────────────────────── */}
+      <AddPillarsModal
+        visible={!!addPillarsTarget}
+        rental={addPillarsTarget}
+        onClose={() => setAddPillarsTarget(null)}
+        onPaymentSettled={handlePaymentSettled}
+      />
+
+      {/* ─── Extend Rental Modal ──────────────────────────────────────── */}
+      <ExtendRentalModal
+        visible={!!extendTarget}
+        rental={extendTarget}
+        onClose={() => setExtendTarget(null)}
+        onPaymentSettled={handlePaymentSettled}
       />
     </SafeAreaView>
   );
@@ -863,7 +936,7 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.label, color: colors.gray[900], fontSize: 14 },
   cardSub: { ...typography.caption, color: colors.gray[500] },
 
-  pillarsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
+  pillarsRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 4, marginTop: 5, alignItems: 'center' },
   pillarBadge: {
     backgroundColor: colors.green[50],
     paddingHorizontal: 7,
@@ -871,13 +944,37 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.green[200],
+    flexShrink: 1,
+    maxWidth: '75%',
   },
   pillarBadgeText: { fontSize: 10, color: colors.green[800], fontFamily: 'Inter_600SemiBold' },
+  pillarMoreBadge: {
+    backgroundColor: colors.green[600],
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    flexShrink: 0,
+  },
+  pillarMoreText: { fontSize: 10, color: colors.white, fontFamily: 'Inter_700Bold' },
   cardTree: { ...typography.caption, color: colors.green[700], fontFamily: 'Inter_600SemiBold', marginTop: 3 },
 
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
   cardDate: { ...typography.caption, color: colors.gray[400] },
   dateSep: { ...typography.caption, color: colors.gray[300] },
+
+  areaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    backgroundColor: colors.gray[50],
+    borderRadius: radius.md,
+  },
+  areaText: { ...typography.caption, fontSize: 11.5, color: colors.gray[600] },
+  areaBold: { fontWeight: '700', color: colors.gray[800] },
 
   rightCol: { alignItems: 'flex-end', gap: 5, flexShrink: 0 },
   cardPrice: { ...typography.label, fontSize: 13, color: colors.green[600] },
@@ -886,7 +983,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     marginTop: spacing.md,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
@@ -921,43 +1018,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: colors.green[50],
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.green[300],
-    paddingVertical: 9,
+    paddingVertical: 8,
   },
   btnPlantText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.green[700] },
+  btnAddPillars: {
+    flex: 1.1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    backgroundColor: colors.emerald[50],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.emerald[300],
+    paddingVertical: 8,
+  },
+  btnAddPillarsDisabled: {
+    backgroundColor: colors.gray[50],
+    borderColor: colors.gray[200],
+    opacity: 0.6,
+  },
+  btnAddPillarsText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.emerald[700] },
   btnExtend: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#eff6ff',
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: '#bfdbfe',
-    paddingVertical: 9,
+    paddingVertical: 8,
   },
   btnExtendText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#1d4ed8' },
   btnIncident: {
-    flex: 1,
+    flex: 0.9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#fef2f2',
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: '#fecaca',
-    paddingVertical: 9,
+    paddingVertical: 8,
   },
   btnIncidentText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#dc2626' },
   btnDetail: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.gray[200],

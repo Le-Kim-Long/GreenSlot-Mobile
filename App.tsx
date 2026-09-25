@@ -18,6 +18,8 @@ import { AlertProvider } from './src/context/AlertContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { LoadingScreen } from './src/components/ui/LoadingScreen';
 import { setupNotificationListeners } from './src/utils/notificationHelper';
+import { InAppNotificationProvider } from './src/components/common/InAppNotificationBanner';
+import { navigationRef } from './src/navigation/navigationRef';
 import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync();
@@ -74,10 +76,11 @@ export default function App() {
     <SafeAreaProvider onLayout={onLayoutRootView}>
       <AlertProvider>
         <AuthProvider>
-          <NavigationContainer linking={linking as any}>
+          <NavigationContainer ref={navigationRef} linking={linking as any}>
             <StatusBar style="dark" />
             <RootNavigator />
           </NavigationContainer>
+          <InAppNotificationProvider />
         </AuthProvider>
       </AlertProvider>
     </SafeAreaProvider>

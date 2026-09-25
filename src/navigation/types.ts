@@ -20,7 +20,7 @@ export type CustomerTabParamList = {
 export type CustomerStackParamList = {
   CustomerTabs: undefined;
   GardenDetail: { slot: AvailableSlotDTO };
-  RentalDetail: { rental: BookingHistory };
+  RentalDetail: { rental?: BookingHistory; rentalId?: number; slotNumber?: string };
   IoTMonitoring: undefined;
   IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
   Camera: undefined;
@@ -32,8 +32,9 @@ export type CustomerStackParamList = {
   HarvestHistory?: undefined;
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
-    type?: 'rental' | 'tree';
+    type?: 'rental' | 'tree' | 'add_pillar' | 'extend';
     rentalId?: number;
+    rental?: BookingHistory;
     slotNumber?: string;
     amount?: string;
     txnRef?: string;

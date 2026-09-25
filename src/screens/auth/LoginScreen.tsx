@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Leaf, User, Lock, AlertCircle, ArrowRight, Sparkles, CheckSquare, Square } from 'lucide-react-native';
@@ -17,6 +18,7 @@ import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { AuthScreenProps } from '../../navigation/types';
+import { showInAppNotification } from '../../components/common/InAppNotificationBanner';
 
 export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const { login, loginWithGoogle } = useAuth();
@@ -120,6 +122,11 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     try {
       const result = await login(username.trim(), password);
       if (result === true) {
+        showInAppNotification({
+          title: '🎉 Đăng nhập thành công',
+          body: `Chào mừng trở lại, ${username.trim()}!`,
+          variant: 'success',
+        });
         if (rememberMe) {
           await AsyncStorage.setItem('greenslot_remembered_user', username.trim());
         } else {
@@ -170,7 +177,13 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
       }
 
       const result = await loginWithGoogle(idToken, 'login');
-      if (result !== true) {
+      if (result === true) {
+        showInAppNotification({
+          title: '🎉 Đăng nhập thành công',
+          body: 'Chào mừng bạn đến với GreenSlot!',
+          variant: 'success',
+        });
+      } else {
         setApiError(typeof result === 'string' ? result : 'Đăng nhập Google thất bại trên máy chủ.');
       }
     } catch (err: any) {

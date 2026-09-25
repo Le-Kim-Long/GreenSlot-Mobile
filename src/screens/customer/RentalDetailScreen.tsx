@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  FlatList,
   Alert,
   TextInput,
   ActivityIndicator,
@@ -15,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Leaf,
   MapPin,
-  Calendar,
   ChevronRight,
   X,
   Clock,
@@ -24,6 +22,8 @@ import {
   CalendarCheck2,
   TriangleAlert,
   Send,
+  Layers,
+  PlusCircle,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -33,11 +33,12 @@ import { Badge, statusToBadge } from '../../components/ui/Badge';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerStackProps } from '../../navigation/types';
-import type { ServiceTypeDTO } from '../../types/api';
+import type { ServiceTypeDTO, BookingHistory } from '../../types/api';
 import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
+import { AddPillarsModal } from '../../components/customer/AddPillarsModal';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12, 18, 24];
+const QUICK_MONTHS = [1, 3, 6, 12, 24];
 
 /** Handles both ISO ("2026-08-26T...") and formatted ("26/8/2026") date strings */
 function parseDateFlexible(raw: string): Date | null {
@@ -82,110 +83,87 @@ function formatDateObj(date: Date): string {
   return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
 }
 
-// ─── Duration Picker Modal ───────────────────────────────────────────────────
-interface DurationPickerProps {
-  visible: boolean;
-  current: number;
-  onSelect: (months: number) => void;
-  onClose: () => void;
-}
 
-function DurationPicker({ visible, current, onSelect, onClose }: DurationPickerProps) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={pickerStyles.overlay}>
-        <View style={pickerStyles.sheet}>
-          <View style={pickerStyles.header}>
-            <Text style={pickerStyles.title}>Chọn số tháng gia hạn</Text>
-            <TouchableOpacity onPress={onClose} style={pickerStyles.closeBtn}>
-              <X size={22} color={colors.gray[600]} />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={DURATION_OPTIONS}
-            keyExtractor={item => item.toString()}
-            numColumns={3}
-            contentContainerStyle={pickerStyles.grid}
-            renderItem={({ item }) => {
-              const isSelected = item === current;
-              return (
-                <TouchableOpacity
-                  style={[pickerStyles.option, isSelected && pickerStyles.optionSelected]}
-                  onPress={() => { onSelect(item); onClose(); }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[pickerStyles.optionNum, isSelected && pickerStyles.optionNumSelected]}>
-                    {item}
-                  </Text>
-                  <Text style={[pickerStyles.optionLabel, isSelected && pickerStyles.optionLabelSelected]}>
-                    tháng
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-}
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function RentalDetailScreen({ route, navigation }: CustomerStackProps<'RentalDetail'>) {
-  const { rental: initialRental } = route.params;
-  const [rental, setRental] = useState(initialRental);
-  const [selectedMonths, setSelectedMonths] = useState(3);
-  const [pickerVisible, setPickerVisible] = useState(false);
+  const { rental: initialRental, rentalId, slotNumber } = (route.params || {}) as any;
+  const [rental, setRental] = useState<BookingHistory | null>(initialRental || null);
+  const [loading, setLoading] = useState<boolean>(!initialRental && !!(rentalId || slotNumber));
+  const [selectedMonths, setSelectedMonths] = useState(1);
+  const [monthsInput, setMonthsInput] = useState('1');
+  const [monthsError, setMonthsError] = useState('');
   const [extending, setExtending] = useState(false);
+  const [addPillarsVisible, setAddPillarsVisible] = useState(false);
 
-  const currentEndDate = useMemo(() => parseToDate(rental.endDate), [rental.endDate]);
+  useEffect(() => {
+    if (!rental && (rentalId || slotNumber)) {
+      setLoading(true);
+      bookingApi.getHistory()
+        .then(history => {
+          const found = history.find(r =>
+            (rentalId && r.id === rentalId) ||
+            (slotNumber && r.slotNumber?.toLowerCase() === slotNumber.toLowerCase())
+          );
+          if (found) {
+            setRental(found);
+          } else if (history.length > 0) {
+            setRental(history[0]);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load rental:', err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [rentalId, slotNumber]);
+
+  const slotArea = rental?.slotArea || 10.0;
+  const currentUsedArea = useMemo(() => {
+    if (!rental) return 0;
+    let used = (rental.pillars || []).reduce((sum: number, p: any) => {
+      const req = p.requiredArea || (p.capacityHoles && p.capacityHoles >= 48 ? 2.0 : (p.capacityHoles && p.capacityHoles >= 36 ? 1.5 : 1.0));
+      return sum + req;
+    }, 0);
+    if (used === 0 && rental.pillarCode && rental.pillarCode !== 'N/A' && rental.pillarCode !== 'arduino-greenhouse-01') {
+      used = 1.0;
+    }
+    return used;
+  }, [rental]);
+  const availableArea = Math.max(0, Number((slotArea - currentUsedArea).toFixed(1)));
+
+  const extLandPrice = rental?.landPrice ?? 0;
+  const extPillarsPrice =
+    rental?.monthlyPillarsPrice ??
+    (rental?.pillars?.reduce((sum: number, p: any) => sum + (p.price ?? 0), 0) ?? 0);
+  const pillarsCount = rental?.pillars?.length || rental?.pillarCodes?.length || 1;
+
+  const currentEndDate = useMemo(() => parseToDate(rental?.endDate || ''), [rental?.endDate]);
   const newEndDate = useMemo(() => addMonthsToDate(currentEndDate, selectedMonths), [currentEndDate, selectedMonths]);
   const pricePerMonth = useMemo(() => {
-    // 1. Ưu tiên lấy từ giao dịch EXT_ đã tồn tại (amount / months do chính BE tính)
-    const extTx = rental.transactions?.find(t => t.vnpTxnRef?.startsWith('EXT_'));
-    if (extTx) {
-      const parts = extTx.vnpTxnRef?.split('_') ?? [];
-      const extMonths = parts.length >= 3 ? Number(parts[2]) : 0;
-      const extAmount = Number(extTx.amount);
-      if (extMonths > 0 && extAmount > 0) {
-        return Math.round(extAmount / extMonths);
-      }
-    }
-
-    // 2. Dùng monthlyPrice từ adapter (đã tính đất + trụ chuẩn xác)
+    if (!rental) return 0;
     if (rental.monthlyPrice && rental.monthlyPrice > 0) {
       return rental.monthlyPrice;
     }
-
-    // 3. Tự tính trực tiếp theo công thức chuẩn: giá đất + giá các trụ (Small 150k, Medium 200k, Large 300k)
-    const landPrice = rental.monthlyPrice ?? 0;
-    let pillarsPrice = 0;
-    if (rental.pillars && rental.pillars.length > 0) {
-      pillarsPrice = rental.pillars.reduce((sum, p) => {
-        if (p.price != null && p.price > 0) return sum + p.price;
-        const code = (p.pillarCode || '').toUpperCase();
-        const type = (p.pillarType || '').toUpperCase();
-        if (type === 'SMALL' || code.includes('-S')) return sum + 150000;
-        if (type === 'LARGE' || code.includes('-L')) return sum + 300000;
-        return sum + 200000;
-      }, 0);
-    } else {
-      const pCount = rental.pillarCodes?.length || (rental.pillarCode ? 1 : 0);
-      pillarsPrice = pCount * 200000;
+    if (extLandPrice + extPillarsPrice > 0) {
+      return extLandPrice + extPillarsPrice;
     }
-    const computed = landPrice + pillarsPrice;
-    if (computed > 0) return computed;
 
-    // 4. Fallback cuối cùng
-    return Math.round(rental.totalPrice / Math.max(1,
-      (() => {
-        const start = parseToDate(rental.startDate);
-        const end = parseToDate(rental.endDate);
-        const diffMs = end.getTime() - start.getTime();
-        return Math.max(1, Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)));
-      })()
-    ));
-  }, [rental.monthlyPrice, rental.totalPrice, rental.startDate, rental.endDate, rental.transactions, rental.pillars, rental.pillarCodes, rental.pillarCode]);
+    const initialBookingTx = rental.transactions?.find((t: any) => t.vnpTxnRef?.startsWith('BOOK_')) ?? rental.transactions?.[0];
+    const durationMonths = (() => {
+      if (!rental.startDate || !rental.endDate) return 1;
+      const start = parseToDate(rental.startDate);
+      const end = parseToDate(rental.endDate);
+      const diffMs = end.getTime() - start.getTime();
+      return Math.max(1, Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)));
+    })();
+
+    return initialBookingTx
+      ? Math.round(Number(initialBookingTx.amount) / durationMonths)
+      : Math.round(rental.totalPrice / durationMonths);
+  }, [rental, extLandPrice, extPillarsPrice]);
   const extensionCost = pricePerMonth * selectedMonths;
 
   // ── Incident report state ────────────────────────────────────────────────
@@ -210,6 +188,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   };
 
   const handleIncidentSubmit = async () => {
+    if (!rental) return;
     if (!selectedTypeId) { Alert.alert('Vui lòng chọn loại sự cố!'); return; }
     if (!incidentDesc.trim() || incidentDesc.trim().length < 10) {
       Alert.alert('Mô tả cần ít nhất 10 ký tự.');
@@ -234,6 +213,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   };
 
   const handleCancelBooking = () => {
+    if (!rental) return;
     Alert.alert(
       'Hủy hợp đồng thuê',
       `Bạn có chắc chắn muốn hủy đơn thuê ô vườn ${rental.slotNumber} này không?`,
@@ -258,6 +238,8 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
 
   const handleExtend = async () => {
+    if (!rental) return;
+    const currentRental = rental;
     Alert.alert(
       'Xác nhận gia hạn',
       `Gia hạn thêm ${selectedMonths} tháng?\nĐến ngày: ${formatDateObj(newEndDate)}\nPhí ước tính: ${formatCurrency(extensionCost)}`,
@@ -269,18 +251,20 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             setExtending(true);
             try {
               const result = await bookingApi.extendBooking({
-                rentalId: rental.id,
+                rentalId: currentRental.id,
                 durationInMonths: selectedMonths,
                 isMobile: true,
                 mobileRedirectUrl: getMobileRedirectUrl(),
               });
               if (result.paymentUrl) {
-                const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, rental.id);
+                const settled = await openAndWaitForPayment(result.paymentUrl, bookingApi.getHistory, currentRental.id);
                 const callback = 'callback' in settled ? settled.callback : undefined;
                 navigation.replace('PaymentResult', {
                   status: settled.status,
-                  rentalId: rental.id,
-                  slotNumber: rental.slotNumber,
+                  type: 'extend',
+                  rentalId: currentRental.id,
+                  rental: currentRental,
+                  slotNumber: currentRental.slotNumber,
                   amount: callback?.amount,
                   txnRef: callback?.txnRef,
                   orderInfo: callback?.orderInfo
@@ -297,6 +281,19 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
       ]
     );
   };
+
+  if (loading || !rental) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.green[600]} />
+          <Text style={{ marginTop: 12, color: colors.gray[600], fontSize: 13 }}>
+            Đang tải thông tin ô vườn...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const badge = statusToBadge(rental.status);
   const isActive = rental.status === 'ACTIVE';
@@ -319,19 +316,40 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
         {/* ── Quick Actions Row ─────────────────────────── */}
         {isActive && (
-          <View style={[styles.card, { flexDirection: 'row', gap: spacing.sm, padding: spacing.md }]}>
+          <View style={[styles.card, { flexDirection: 'row', gap: spacing.xs, padding: spacing.md }]}>
             <TouchableOpacity
               style={[styles.btnPlant, { flex: 1, margin: 0 }]}
               onPress={() => navigation.navigate('CustomerTreePlanting', { rentalId: rental.id } as any)}
             >
-              <Sprout size={15} color={colors.green[700]} />
-              <Text style={styles.btnPlantText}>Trồng cây mới</Text>
+              <Sprout size={14} color={colors.green[700]} />
+              <Text style={styles.btnPlantText}>Trồng mới</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={[styles.btnIncident, { flex: 1, margin: 0 }]}
+              style={[
+                styles.btnAddPillarQuick,
+                availableArea < 1.0 && styles.btnAddPillarQuickDisabled,
+                { flex: 1.1, margin: 0 },
+              ]}
+              onPress={() => {
+                if (availableArea < 1.0) {
+                  Alert.alert('Thông báo', 'Ô vườn đã hết diện tích trống để đặt thêm trụ.');
+                  return;
+                }
+                setAddPillarsVisible(true);
+              }}
+            >
+              <PlusCircle size={14} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
+              <Text style={[styles.btnAddPillarQuickText, availableArea < 1.0 && { color: colors.gray[400] }]}>
+                Thuê thêm trụ
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btnIncident, { flex: 0.9, margin: 0 }]}
               onPress={openIncident}
             >
-              <TriangleAlert size={15} color="#dc2626" strokeWidth={2} />
+              <TriangleAlert size={14} color="#dc2626" strokeWidth={2} />
               <Text style={styles.btnIncidentText}>Báo sự cố</Text>
             </TouchableOpacity>
           </View>
@@ -344,7 +362,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               <Sprout size={18} color={colors.green[700]} />
               <Text style={styles.sectionTitle}>Chi tiết trụ canh tác</Text>
             </View>
-            {rental.pillars.map((p, idx) => {
+            {rental.pillars.map((p: any, idx: number) => {
               const treeName = p.treeName;
               const harvestDate = p.expectedHarvestDate || p.expectedHarvestAt || (treeName ? rental.expectedHarvestAt : undefined);
               return (
@@ -427,6 +445,20 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             </View>
           </View>
 
+          {/* Diện tích ô vườn */}
+          <View style={styles.infoRow}>
+            <Layers size={16} color={colors.green[600]} />
+            <View style={styles.infoTexts}>
+              <Text style={styles.infoLabel}>Diện tích ô vườn</Text>
+              <Text style={styles.infoValue}>
+                {slotArea}m² (Đã dùng {currentUsedArea.toFixed(1)}m² · Trống{' '}
+                <Text style={{ color: availableArea >= 1.0 ? colors.emerald[700] : colors.orange[600], fontWeight: '700' }}>
+                  {availableArea.toFixed(1)}m²
+                </Text>)
+              </Text>
+            </View>
+          </View>
+
           {/* Date Range */}
           <View style={styles.dateRangeCard}>
             <View style={styles.dateBlock}>
@@ -472,19 +504,58 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               </Text>
             </Text>
 
-            {/* Duration picker button */}
+            {/* Duration — inline input + quick chips */}
             <Text style={styles.fieldLabel}>Thời gian gia hạn</Text>
-            <TouchableOpacity
-              style={styles.pickerButton}
-              onPress={() => setPickerVisible(true)}
-              activeOpacity={0.7}
-            >
-              <Calendar size={18} color={colors.green[600]} />
-              <Text style={styles.pickerButtonText}>{selectedMonths} tháng</Text>
-              <View style={styles.pickerBadge}>
-                <Text style={styles.pickerBadgeText}>Thay đổi</Text>
-              </View>
-            </TouchableOpacity>
+
+            <View style={[styles.monthInputWrapper, monthsError ? styles.monthInputError : null]}>
+              <TextInput
+                style={styles.monthTextInput}
+                keyboardType="number-pad"
+                value={monthsInput}
+                onChangeText={raw => {
+                  const cleaned = raw.replace(/\D/g, '');
+                  setMonthsInput(cleaned);
+                  if (!cleaned) {
+                    setSelectedMonths(0);
+                    setMonthsError('Vui lòng nhập số tháng (tối thiểu 1).');
+                  } else {
+                    const n = parseInt(cleaned, 10);
+                    if (n < 1) { setSelectedMonths(0); setMonthsError('Tối thiểu 1 tháng.'); }
+                    else if (n > 120) { setSelectedMonths(n); setMonthsError('Tối đa 120 tháng.'); }
+                    else { setSelectedMonths(n); setMonthsError(''); }
+                  }
+                }}
+                placeholder="Nhập số tháng..."
+                placeholderTextColor={colors.gray[400]}
+              />
+              <Text style={styles.monthInputSuffix}>tháng</Text>
+            </View>
+
+            {monthsError ? (
+              <Text style={styles.monthInputErrText}>⚠️ {monthsError}</Text>
+            ) : null}
+
+            {/* Quick Chips */}
+            <View style={styles.quickChipsRow}>
+              {QUICK_MONTHS.map(m => {
+                const isSelected = selectedMonths === m && !monthsError;
+                return (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.quickChip, isSelected && styles.quickChipActive]}
+                    onPress={() => { setMonthsInput(m.toString()); setSelectedMonths(m); setMonthsError(''); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[styles.quickChipText, isSelected && styles.quickChipTextActive]}
+                      numberOfLines={1}
+                    >
+                      {m} tháng
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             {/* New date range preview */}
             <View style={styles.dateRangeCard}>
@@ -503,25 +574,64 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               </View>
             </View>
 
-            {/* Duration summary */}
-            <View style={styles.durationSummary}>
-              <Clock size={14} color={colors.green[600]} />
-              <Text style={styles.durationText}>
-                Gia hạn thêm{' '}
-                <Text style={styles.durationHighlight}>{selectedMonths} tháng</Text>
-              </Text>
-            </View>
+            {/* Cost breakdown giống FE (Bóc tách minh bạch) */}
+            <View style={styles.extendBreakdownCard}>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Tiền thuê đất ô vườn:</Text>
+                <Text style={styles.breakdownValue}>{formatCurrency(extLandPrice)}/tháng</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Tiền thuê trụ ({pillarsCount} trụ):</Text>
+                <Text style={styles.breakdownValue}>{formatCurrency(extPillarsPrice)}/tháng</Text>
+              </View>
 
-            {/* Cost estimate */}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Phí gia hạn ước tính</Text>
-              <Text style={styles.totalValue}>{formatCurrency(extensionCost)}</Text>
+              {rental.pillars && rental.pillars.length > 0 && (
+                <View style={styles.pillarsDetailList}>
+                  {rental.pillars.map((p: any, idx: number) => {
+                    const type = p.pillarType?.toUpperCase();
+                    const holes = p.capacityHoles || (type === 'LARGE' ? 48 : type === 'MEDIUM' ? 36 : 24);
+                    const label =
+                      type === 'LARGE' || holes >= 48
+                        ? `Trụ Lớn (${holes} hốc)`
+                        : type === 'MEDIUM' || holes >= 36
+                        ? `Trụ Vừa (${holes} hốc)`
+                        : `Trụ Nhỏ (${holes} hốc)`;
+                    return (
+                      <View key={p.id || idx} style={styles.pillarDetailLine}>
+                        <Text style={styles.pillarDetailLineCode}>
+                          • {p.pillarCode} - {label}
+                        </Text>
+                        <Text style={styles.pillarDetailLinePrice}>
+                          {formatCurrency(p.price || 0)}/tháng
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <View style={styles.breakdownDivider} />
+
+              <View style={styles.breakdownRow}>
+                <Text style={[styles.breakdownLabel, { fontWeight: '600' }]}>Tổng đơn giá thuê ô & trụ:</Text>
+                <Text style={[styles.breakdownValue, { color: colors.emerald[800] }]}>{formatCurrency(pricePerMonth)}/tháng</Text>
+              </View>
+
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Thời gian gia hạn:</Text>
+                <Text style={styles.breakdownValue}>{selectedMonths} tháng</Text>
+              </View>
+              <View style={[styles.breakdownRow, styles.breakdownTotalRow]}>
+                <Text style={styles.breakdownTotalLabel}>Tổng tiền cần thanh toán:</Text>
+                <Text style={styles.breakdownTotalValue}>{formatCurrency(extensionCost)}</Text>
+              </View>
             </View>
 
             <Button
-              title="Xác nhận & Thanh toán VNPay"
+              title={extending ? 'Đang xử lý...' : `Xác nhận & Thanh toán (${formatCurrency(extensionCost)})`}
               onPress={handleExtend}
               loading={extending}
+              disabled={extending || !selectedMonths || selectedMonths < 1 || Boolean(monthsError)}
             />
 
             <Text style={styles.noteText}>
@@ -536,12 +646,24 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Duration Picker Modal */}
-      <DurationPicker
-        visible={pickerVisible}
-        current={selectedMonths}
-        onSelect={setSelectedMonths}
-        onClose={() => setPickerVisible(false)}
+
+      {/* Add Pillars Modal */}
+      <AddPillarsModal
+        visible={addPillarsVisible}
+        rental={rental}
+        onClose={() => setAddPillarsVisible(false)}
+        onPaymentSettled={async (status, callback, rentalId) => {
+          navigation.replace('PaymentResult', {
+            status,
+            type: 'add_pillar',
+            rentalId: rentalId || rental.id,
+            rental,
+            slotNumber: rental.slotNumber,
+            amount: callback?.amount,
+            txnRef: callback?.txnRef,
+            orderInfo: callback?.orderInfo,
+          });
+        }}
       />
 
       {/* Incident Report Modal */}
@@ -707,35 +829,79 @@ const styles = StyleSheet.create({
 
   fieldLabel: { ...typography.caption, color: colors.gray[700], marginBottom: 6, fontWeight: '600' },
 
-  pickerButton: {
+  monthInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
     borderWidth: 1.5,
-    borderColor: colors.green[300],
-    borderRadius: radius.lg,
+    borderColor: colors.gray[200],
+    borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    marginBottom: spacing.sm,
+    backgroundColor: colors.gray[50],
+    marginBottom: spacing.xs,
   },
-  pickerButtonText: { ...typography.body, color: colors.gray[800], flex: 1 },
-  pickerBadge: {
-    backgroundColor: colors.green[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.full,
+  monthInputError: {
+    borderColor: colors.red[500],
   },
-  pickerBadgeText: { ...typography.caption, color: colors.green[700], fontWeight: '700' },
+  monthTextInput: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  monthInputSuffix: {
+    fontSize: 13,
+    color: colors.gray[500],
+    fontWeight: '600',
+    marginLeft: spacing.xs,
+  },
+  monthInputErrText: {
+    fontSize: 11,
+    color: colors.red[600],
+    marginBottom: spacing.xs,
+    fontWeight: '500',
+  },
 
-  durationSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+  extendBreakdownCard: {
+    backgroundColor: colors.green[50],
+    borderWidth: 1,
+    borderColor: colors.green[200],
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
   },
-  durationText: { ...typography.bodySmall, color: colors.gray[600] },
-  durationHighlight: { color: colors.green[700], fontWeight: '700' },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  breakdownLabel: {
+    ...typography.caption,
+    color: colors.gray[600],
+  },
+  breakdownValue: {
+    ...typography.caption,
+    color: colors.gray[900],
+    fontFamily: 'Inter_600SemiBold',
+  },
+  breakdownTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.green[200],
+    paddingTop: 8,
+    marginTop: 4,
+    marginBottom: 0,
+  },
+  breakdownTotalLabel: {
+    ...typography.bodySmall,
+    color: colors.gray[900],
+    fontFamily: 'Inter_700Bold',
+  },
+  breakdownTotalValue: {
+    ...typography.label,
+    color: colors.green[700],
+    fontFamily: 'Inter_700Bold',
+  },
 
   noteText: {
     ...typography.caption,
@@ -885,8 +1051,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   btnPlantText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.green[700] },
+  btnAddPillarQuick: {
+    flex: 1.1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.emerald[50],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.emerald[300],
+    paddingVertical: 12,
+  },
+  btnAddPillarQuickDisabled: {
+    backgroundColor: colors.gray[50],
+    borderColor: colors.gray[200],
+    opacity: 0.6,
+  },
+  btnAddPillarQuickText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.emerald[700] },
   btnIncident: {
-    flex: 1,
+    flex: 0.9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -898,48 +1082,68 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   btnIncidentText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#dc2626' },
-});
 
-// ─── Duration Picker Styles ───────────────────────────────────────────────────
-const pickerStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 32,
-    maxHeight: '75%',
-  },
-  header: {
+  quickChipsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    flexWrap: 'nowrap',
+    gap: 4,
+    marginBottom: spacing.sm,
   },
-  title: { ...typography.label, color: colors.gray[900] },
-  closeBtn: { padding: 4 },
-  grid: { padding: spacing.md, gap: spacing.sm },
-  option: {
+  quickChip: {
     flex: 1,
-    margin: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 0,
+    borderRadius: radius.md,
+    backgroundColor: colors.gray[100],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
     alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: radius.lg,
-    backgroundColor: colors.green[50],
-    borderWidth: 1.5,
-    borderColor: colors.green[100],
+    justifyContent: 'center',
   },
-  optionSelected: {
-    backgroundColor: colors.green[600],
-    borderColor: colors.green[700],
+  quickChipActive: {
+    backgroundColor: colors.emerald[600],
+    borderColor: colors.emerald[600],
   },
-  optionNum: { fontSize: 22, fontWeight: '700', color: colors.green[700] },
-  optionNumSelected: { color: colors.white },
-  optionLabel: { ...typography.caption, color: colors.green[500] },
-  optionLabelSelected: { color: 'rgba(255,255,255,0.8)' },
+  quickChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.gray[700],
+    textAlign: 'center',
+  },
+  quickChipTextActive: {
+    color: colors.white,
+  },
+
+  pillarsDetailList: {
+    borderLeftWidth: 2,
+    borderLeftColor: colors.emerald[300],
+    paddingLeft: spacing.sm,
+    marginVertical: spacing.xs,
+    gap: 3,
+    backgroundColor: 'rgba(209, 250, 229, 0.35)',
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  pillarDetailLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pillarDetailLineCode: {
+    fontSize: 11,
+    color: colors.gray[700],
+    flex: 1,
+  },
+  pillarDetailLinePrice: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.gray[800],
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: colors.emerald[200],
+    marginVertical: 4,
+  },
 });
 
 // ─── Incident Modal Styles ────────────────────────────────────────────────────

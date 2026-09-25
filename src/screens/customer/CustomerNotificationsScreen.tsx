@@ -92,7 +92,21 @@ export default function CustomerNotificationsScreen() {
     const actionRoute = getNotificationActionRoute(item);
     if (actionRoute) {
       try {
-        navigation.navigate(actionRoute.screen, actionRoute.params);
+        if (actionRoute.screen === 'RentalDetail') {
+          navigation.navigate('RentalDetail', actionRoute.params);
+        } else if (
+          actionRoute.screen === 'Rentals' ||
+          actionRoute.screen === 'Home' ||
+          actionRoute.screen === 'Gardens' ||
+          actionRoute.screen === 'Account'
+        ) {
+          navigation.navigate('CustomerTabs', {
+            screen: actionRoute.screen,
+            params: actionRoute.params,
+          });
+        } else {
+          navigation.navigate(actionRoute.screen as any, actionRoute.params);
+        }
       } catch (err) {
         console.log('Navigation route not available:', actionRoute.screen, err);
       }
@@ -126,9 +140,23 @@ export default function CustomerNotificationsScreen() {
   };
 
   const renderItem = ({ item }: { item: NotificationResponseDTO }) => {
-    const meta = getNotificationMeta(item.type);
+    const meta = getNotificationMeta(item.type, item.title, item.message);
     const IconComponent = meta.icon;
     const actionRoute = getNotificationActionRoute(item);
+
+    const actionBtnLabel = actionRoute
+      ? actionRoute.screen === 'RentalDetail'
+        ? 'Xem chi tiết ô vườn'
+        : actionRoute.screen === 'CustomerTreePlanting'
+        ? (actionRoute.params?.autoOpenDetail ? 'Xem chi tiết giống rau' : 'Xem yêu cầu trồng cây')
+        : actionRoute.screen === 'Rentals'
+        ? 'Xem vườn của tôi'
+        : actionRoute.screen === 'PaymentHistory'
+        ? 'Xem lịch sử thanh toán'
+        : actionRoute.screen === 'CustomerHarvestHistory'
+        ? 'Xem lịch sử thu hoạch'
+        : 'Xem chi tiết'
+      : null;
 
     return (
       <TouchableOpacity
@@ -168,7 +196,7 @@ export default function CustomerNotificationsScreen() {
 
           {actionRoute && (
             <View style={styles.actionFooter}>
-              <Text style={styles.actionText}>Xem chi tiết</Text>
+              <Text style={styles.actionText}>{actionBtnLabel}</Text>
               <ChevronRight size={14} color={colors.green[600]} />
             </View>
           )}

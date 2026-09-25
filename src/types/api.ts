@@ -70,6 +70,7 @@ export interface PillarDetail {
   pillarTypeName?: string;
   capacityHoles?: number;
   price?: number;
+  monthlyPrice?: number;
   requiredArea?: number;
   defaultTreeId?: number;
   defaultTreeName?: string;
@@ -139,6 +140,34 @@ export interface ExtensionRequestDTO {
   durationInMonths: number;
   isMobile?: boolean;
   mobileRedirectUrl?: string;
+  redirectUrl?: string;
+}
+
+export interface AddPillarsRequestDTO {
+  smallCount?: number;
+  mediumCount?: number;
+  largeCount?: number;
+  isMobile?: boolean;
+  redirectUrl?: string;
+}
+
+export interface AddPillarsPreviewDTO {
+  rentalId: number;
+  slotNumber: string;
+  daysRemaining: number;
+  slotTotalArea: number;
+  currentUsedArea: number;
+  availableArea: number;
+  requestedArea: number;
+  remainingAreaAfter: number;
+  smallCount: number;
+  mediumCount: number;
+  largeCount: number;
+  totalPillars: number;
+  monthlyPillarsPrice: number;
+  totalAmount: number;
+  canAdd: boolean;
+  message: string;
 }
 
 export interface PaymentTransactionInfo {
@@ -147,6 +176,10 @@ export interface PaymentTransactionInfo {
   vnpTxnRef: string;
   paymentDate: string;
   status: string;
+  targetPillarCode?: string;
+  targetPillarHoles?: number;
+  treeName?: string;
+  pillarsCount?: number;
 }
 
 export interface RentalHistoryDTO {
@@ -165,6 +198,9 @@ export interface RentalHistoryDTO {
   treeName?: string;
   cropStatus?: string;
   monthlyPrice?: number;
+  landPrice?: number;
+  monthlyPillarsPrice?: number;
+  slotArea?: number;
   transactions: PaymentTransactionInfo[];
   harvestNotifiedAt?: string;
   harvestDecision?: string;
@@ -581,6 +617,9 @@ export interface BookingHistory {
   endTime?: string;
   totalPrice: number;
   monthlyPrice?: number;
+  landPrice?: number;
+  monthlyPillarsPrice?: number;
+  slotArea?: number;
   status: string;
   paymentStatus?: string;
   treeId?: number;
@@ -601,3 +640,5 @@ export type ServiceRequest = ServiceRequestDTO;
 export type BookingRequest = BookingRequestDTO;
 export type BookingResponse = BookingResponseDTO;
 export type ExtensionRequest = ExtensionRequestDTO;
+export type AddPillarsRequest = AddPillarsRequestDTO;
+export type AddPillarsPreview = AddPillarsPreviewDTO;

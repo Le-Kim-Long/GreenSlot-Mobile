@@ -38,7 +38,8 @@
       "expo-splash-screen",
       "expo-secure-store",
       "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-sharing"
     ]
   }
 }

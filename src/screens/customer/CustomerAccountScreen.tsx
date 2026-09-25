@@ -1,5 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, Image } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -13,11 +21,13 @@ import {
   Sprout,
   Bell,
   MapPin,
-  Edit2,
+  Edit3,
   Phone,
   Image as ImageIcon,
   X,
   UserX,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { roleLabel } from '../../utils/roleMap';
@@ -28,15 +38,23 @@ import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerTabProps } from '../../navigation/types';
 import { userApi } from '../../api/userApi';
-import { preferenceApi } from '../../api/preferenceApi';
 import type { ProfileResponseDTO } from '../../types/api';
 import apiClient from '../../api/client';
+import { showInAppNotification } from '../../components/common/InAppNotificationBanner';
+
+interface MenuItemConfig {
+  icon: any;
+  label: string;
+  subtitle: string;
+  screen: 'CustomerDashboard' | 'Notifications' | 'IoTMonitoring' | 'CustomerTreePlanting' | 'CustomerHarvestHistory' | 'Camera' | 'PaymentHistory';
+  iconColor: string;
+  iconBg: string;
+}
 
 export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'Account'>) {
   const { user, logout } = useAuth();
   const [profile, setProfile] = useState<ProfileResponseDTO | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   // Edit profile states
   const [isEditing, setIsEditing] = useState(false);
@@ -48,14 +66,64 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
   });
   const [updating, setUpdating] = useState(false);
 
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Trang tổng quan', screen: 'CustomerDashboard' as const },
-    { icon: Bell, label: 'Thông báo', screen: 'Notifications' as const },
-    { icon: Wifi, label: 'Giám sát IoT', screen: 'IoTMonitoring' as const },
-    { icon: Sprout, label: 'Yêu cầu trồng cây', screen: 'CustomerTreePlanting' as const },
-    { icon: History, label: 'Lịch sử thu hoạch', screen: 'CustomerHarvestHistory' as const },
-    { icon: Camera, label: 'Camera giám sát', screen: 'Camera' as const },
-    { icon: CreditCard, label: 'Lịch sử thanh toán', screen: 'PaymentHistory' as const },
+  // All 7 services preserved with distinctive modern accents
+  const menuItems: MenuItemConfig[] = [
+    {
+      icon: LayoutDashboard,
+      label: 'Trang tổng quan',
+      subtitle: 'Thống kê & tiến độ các ô vườn của bạn',
+      screen: 'CustomerDashboard',
+      iconColor: colors.green[700],
+      iconBg: colors.green[50],
+    },
+    {
+      icon: Bell,
+      label: 'Thông báo',
+      subtitle: 'Cập nhật tình trạng & hoạt động mới nhất',
+      screen: 'Notifications',
+      iconColor: '#2563eb',
+      iconBg: '#eff6ff',
+    },
+    {
+      icon: Wifi,
+      label: 'Giám sát IoT',
+      subtitle: 'Nhiệt độ, độ ẩm đất, độ ẩm khí & pH ô vườn',
+      screen: 'IoTMonitoring',
+      iconColor: '#0891b2',
+      iconBg: '#ecfeff',
+    },
+    {
+      icon: Sprout,
+      label: 'Yêu cầu trồng cây',
+      subtitle: 'Đăng ký trồng thêm cây giống vào ô vườn',
+      screen: 'CustomerTreePlanting',
+      iconColor: colors.green[600],
+      iconBg: '#f0fdf4',
+    },
+    {
+      icon: History,
+      label: 'Lịch sử thu hoạch',
+      subtitle: 'Nhật ký năng suất & các lần thu hoạch rau củ',
+      screen: 'CustomerHarvestHistory',
+      iconColor: '#d97706',
+      iconBg: '#fffbeb',
+    },
+    {
+      icon: Camera,
+      label: 'Camera giám sát',
+      subtitle: 'Xem hình ảnh trực tiếp thời gian thực',
+      screen: 'Camera',
+      iconColor: '#7c3aed',
+      iconBg: '#f5f3ff',
+    },
+    {
+      icon: CreditCard,
+      label: 'Lịch sử thanh toán',
+      subtitle: 'Tra cứu hóa đơn, biên lai & tải PDF hóa đơn',
+      screen: 'PaymentHistory',
+      iconColor: '#4f46e5',
+      iconBg: '#eef2ff',
+    },
   ];
 
   const loadProfile = useCallback(async () => {
@@ -102,7 +170,11 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
       });
       await loadProfile();
       setIsEditing(false);
-      Alert.alert('Thành công', 'Thông tin cá nhân đã được cập nhật.');
+      showInAppNotification({
+        title: 'Cập nhật thành công',
+        body: 'Thông tin hồ sơ cá nhân đã được lưu.',
+        variant: 'success',
+      });
     } catch (err: any) {
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể cập nhật thông tin.');
     } finally {
@@ -113,7 +185,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
   const handleDeactivateAccount = () => {
     Alert.alert(
       'Vô hiệu hóa tài khoản',
-      'Bạn có chắc chắn muốn vô hiệu hóa tài khoản? Thao tác này sẽ tạm ngưng quyền truy cập của bạn.',
+      'Bạn có chắc chắn muốn vô hiệu hóa tài khoản? Thao tác này sẽ tạm ngưng quyền truy cập của bạn vào hệ thống GreenSlot.',
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -134,7 +206,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
   };
 
   const handleLogout = () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất khỏi ứng dụng?', [
+    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng GreenSlot?', [
       { text: 'Hủy', style: 'cancel' },
       { text: 'Đăng xuất', style: 'destructive', onPress: logout },
     ]);
@@ -142,39 +214,85 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Tài khoản Khách hàng</Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header Title */}
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Tài khoản</Text>
+          <View style={styles.verifiedBadge}>
+            <ShieldCheck size={14} color={colors.green[700]} />
+            <Text style={styles.verifiedText}>Đã xác thực</Text>
+          </View>
+        </View>
 
-        {/* Profile Info Card */}
-        <Card style={styles.profileCard}>
-          <View style={styles.avatar}>
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarWrapper}>
             {profile?.imageUrl ? (
               <Image source={{ uri: profile.imageUrl }} style={styles.avatarImage} />
             ) : (
-              <UserIcon size={36} color={colors.green[600]} />
+              <View style={styles.avatarPlaceholder}>
+                <UserIcon size={34} color={colors.green[600]} />
+              </View>
             )}
+            <View style={styles.onlineDot} />
           </View>
+
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>{profile?.fullName || user?.name || 'Khách hàng'}</Text>
-            <Text style={styles.email}>{profile?.email || user?.email || 'N/A'}</Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>{roleLabel(user?.role || 'customer')}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {profile?.fullName || user?.name || 'Khách hàng GreenSlot'}
+            </Text>
+            <Text style={styles.email} numberOfLines={1}>
+              {profile?.email || user?.email || 'N/A'}
+            </Text>
+
+            <View style={styles.metaRow}>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleText}>{roleLabel(user?.role || 'customer')}</Text>
+              </View>
+              {profile?.phone ? (
+                <View style={styles.phoneTag}>
+                  <Phone size={11} color={colors.gray[600]} />
+                  <Text style={styles.phoneText}>{profile.phone}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
+
           {!isEditing && (
-            <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editBtn}>
-              <Edit2 size={18} color={colors.green[600]} />
+            <TouchableOpacity
+              onPress={() => setIsEditing(true)}
+              style={styles.editBtn}
+              activeOpacity={0.7}
+            >
+              <Edit3 size={16} color={colors.green[700]} />
+              <Text style={styles.editBtnText}>Sửa</Text>
             </TouchableOpacity>
           )}
-        </Card>
+        </View>
 
-        {/* EDIT PROFILE SECTION */}
+        {/* Address tag if available */}
+        {profile?.address && !isEditing ? (
+          <View style={styles.addressBar}>
+            <MapPin size={14} color={colors.gray[500]} />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {profile.address}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* EDIT PROFILE CARD */}
         {isEditing && (
           <Card style={styles.editCard}>
             <View style={styles.editHeader}>
-              <Text style={styles.editTitle}>Chỉnh sửa thông tin</Text>
-              <TouchableOpacity onPress={() => setIsEditing(false)}>
-                <X size={20} color={colors.gray[500]} />
+              <View>
+                <Text style={styles.editTitle}>Chỉnh sửa thông tin</Text>
+                <Text style={styles.editSubtitle}>Cập nhật thông tin cá nhân của bạn</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsEditing(false)}
+                style={styles.closeEditBtn}
+              >
+                <X size={18} color={colors.gray[500]} />
               </TouchableOpacity>
             </View>
 
@@ -182,7 +300,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
               label="Họ và tên *"
               value={editForm.fullName}
               onChangeText={(text) => setEditForm({ ...editForm, fullName: text })}
-              placeholder="Nhập họ và tên"
+              placeholder="Nhập họ và tên đầy đủ"
               leftIcon={<UserIcon size={16} color={colors.green[600]} />}
             />
 
@@ -191,7 +309,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
               value={editForm.phone}
               onChangeText={(text) => setEditForm({ ...editForm, phone: text })}
               keyboardType="phone-pad"
-              placeholder="Nhập số điện thoại"
+              placeholder="Nhập số điện thoại liên hệ"
               leftIcon={<Phone size={16} color={colors.green[600]} />}
             />
 
@@ -199,7 +317,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
               label="Địa chỉ"
               value={editForm.address}
               onChangeText={(text) => setEditForm({ ...editForm, address: text })}
-              placeholder="Nhập địa chỉ"
+              placeholder="Nhập địa chỉ của bạn"
               leftIcon={<MapPin size={16} color={colors.green[600]} />}
             />
 
@@ -207,7 +325,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
               label="Link ảnh đại diện (avatar)"
               value={editForm.imageUrl}
               onChangeText={(text) => setEditForm({ ...editForm, imageUrl: text })}
-              placeholder="Nhập link ảnh (URL)"
+              placeholder="https://example.com/avatar.jpg"
               leftIcon={<ImageIcon size={16} color={colors.green[600]} />}
             />
 
@@ -219,7 +337,7 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
                 style={styles.actionBtn}
               />
               <Button
-                title="Lưu"
+                title="Lưu thay đổi"
                 onPress={handleUpdateProfile}
                 loading={updating}
                 style={styles.actionBtn}
@@ -228,168 +346,378 @@ export default function CustomerAccountScreen({ navigation }: CustomerTabProps<'
           </Card>
         )}
 
-        {/* Services & Utilities Menu */}
+        {/* Services & Utilities Section - Preserved all 7 items with grouped card */}
         {!isEditing && (
-          <>
-            <Text style={styles.sectionTitle}>Dịch vụ & Tiện ích</Text>
-            {menuItems.map((item, i) => (
-              <TouchableOpacity
-                key={i}
-                style={styles.menuItem}
-                onPress={() => navigation.navigate(item.screen)}
-              >
-                <View style={styles.menuIcon}>
-                  <item.icon size={20} color={colors.green[600]} />
-                </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <ChevronRight size={18} color={colors.gray[400]} />
-              </TouchableOpacity>
-            ))}
-          </>
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>DỊCH VỤ & TIỆN ÍCH</Text>
+              <Text style={styles.sectionCount}>{menuItems.length} chức năng</Text>
+            </View>
+
+            <View style={styles.groupedCard}>
+              {menuItems.map((item, index) => {
+                const IconComponent = item.icon;
+                const isLast = index === menuItems.length - 1;
+                return (
+                  <React.Fragment key={item.screen}>
+                    <TouchableOpacity
+                      style={styles.groupedItem}
+                      onPress={() => navigation.navigate(item.screen)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.menuIconBox, { backgroundColor: item.iconBg }]}>
+                        <IconComponent size={20} color={item.iconColor} />
+                      </View>
+                      <View style={styles.menuTextBox}>
+                        <Text style={styles.menuTitle}>{item.label}</Text>
+                        <Text style={styles.menuSubtitle} numberOfLines={1}>
+                          {item.subtitle}
+                        </Text>
+                      </View>
+                      <ChevronRight size={18} color={colors.gray[400]} />
+                    </TouchableOpacity>
+                    {!isLast && <View style={styles.itemDivider} />}
+                  </React.Fragment>
+                );
+              })}
+            </View>
+          </View>
         )}
 
-        <Text style={styles.sectionTitle}>Thiết lập & Quyền riêng tư</Text>
-        <View style={styles.settingItem}>
-          <View style={styles.settingLeft}>
-            <View style={styles.menuIcon}>
-              <Bell size={20} color={colors.green[600]} />
-            </View>
-            <Text style={styles.menuLabel}>Thông báo Push</Text>
+        {/* Account & Security Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>TÀI KHOẢN & BẢO MẬT</Text>
+          <View style={styles.groupedCard}>
+            <TouchableOpacity
+              style={styles.groupedItem}
+              onPress={handleDeactivateAccount}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBox, { backgroundColor: '#fee2e2' }]}>
+                <UserX size={18} color="#dc2626" />
+              </View>
+              <View style={styles.menuTextBox}>
+                <Text style={[styles.menuTitle, { color: '#dc2626' }]}>Vô hiệu hóa tài khoản</Text>
+                <Text style={styles.menuSubtitle}>Tạm ngưng quyền truy cập GreenSlot</Text>
+              </View>
+              <ChevronRight size={18} color={colors.gray[400]} />
+            </TouchableOpacity>
           </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={async (enabled) => {
-              setNotificationsEnabled(enabled);
-              try { await preferenceApi.update({ enabled }); } catch { setNotificationsEnabled(!enabled); Alert.alert('Lỗi', 'Không thể cập nhật cài đặt thông báo.'); }
-            }}
-            trackColor={{ false: colors.gray[300], true: colors.green[500] }}
-          />
         </View>
 
-        <TouchableOpacity style={[styles.menuItem, styles.dangerItem]} onPress={handleDeactivateAccount}>
-          <View style={[styles.menuIcon, styles.dangerIcon]}>
-            <UserX size={20} color={colors.red[600]} />
-          </View>
-          <Text style={[styles.menuLabel, styles.dangerText]}>Vô hiệu hóa tài khoản</Text>
-          <ChevronRight size={18} color={colors.gray[400]} />
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <LogOut size={18} color="#dc2626" />
+          <Text style={styles.logoutBtnText}>Đăng xuất</Text>
         </TouchableOpacity>
 
-        <Button
-          title="Đăng xuất"
-          onPress={handleLogout}
-          variant="outline"
-          style={styles.logout}
-        />
+        <Text style={styles.versionText}>GreenSlot Mobile • Phiên bản 1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  title: { ...typography.heading2, color: colors.gray[900], marginBottom: spacing.lg },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.xl },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.xl,
-    backgroundColor: colors.green[50],
+  safe: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scroll: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
+  title: {
+    fontSize: 24,
+    fontFamily: 'Inter_700Bold',
+    color: colors.gray[900],
+    letterSpacing: -0.3,
   },
-  profileInfo: { flex: 1 },
-  name: { ...typography.heading3, color: colors.gray[900] },
-  email: { ...typography.bodySmall, color: colors.gray[500], marginBottom: spacing.sm },
-  roleBadge: {
-    alignSelf: 'flex-start',
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.green[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: radius.full,
   },
-  roleText: { ...typography.caption, color: colors.green[800], fontFamily: 'Inter_500Medium' },
-  editBtn: {
-    padding: spacing.sm,
+  verifiedText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[800],
+  },
+  profileCard: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginRight: 14,
+  },
+  avatarImage: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 2,
+    borderColor: colors.green[400],
+  },
+  avatarPlaceholder: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     backgroundColor: colors.green[50],
-    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.green[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: '#22c55e',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  profileInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  name: {
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
+    color: colors.gray[900],
+    marginBottom: 2,
+  },
+  email: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[500],
+    marginBottom: 6,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  roleBadge: {
+    backgroundColor: colors.green[100],
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  roleText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[800],
+  },
+  phoneTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.gray[100],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  phoneText: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: colors.gray[600],
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.green[50],
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.green[200],
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  editBtnText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[700],
+  },
+  addressBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  addressText: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[600],
+    flex: 1,
   },
   editCard: {
-    marginBottom: spacing.xl,
-    padding: spacing.md,
+    marginTop: 14,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: colors.green[100],
+    borderColor: colors.green[200],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   editHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
+    alignItems: 'flex-start',
+    marginBottom: 14,
   },
   editTitle: {
-    ...typography.heading3,
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
     color: colors.gray[900],
+  },
+  editSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  closeEditBtn: {
+    padding: 4,
   },
   editActionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
-    gap: spacing.md,
+    marginTop: 12,
+    gap: 12,
   },
   actionBtn: {
     flex: 1,
   },
-  passHeaderToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
+  sectionContainer: {
+    marginTop: 22,
   },
-  passToggleText: {
-    ...typography.body,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.gray[800],
-    flex: 1,
-  },
-  sectionTitle: { ...typography.label, color: colors.gray[500], marginBottom: spacing.sm, marginTop: spacing.md },
-  menuItem: {
+  sectionHeaderRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: colors.gray[500],
+    letterSpacing: 0.8,
+  },
+  sectionCount: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: colors.gray[400],
+  },
+  groupedCard: {
     backgroundColor: colors.white,
-    borderRadius: radius.lg,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.green[100],
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.green[50],
+  groupedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+  },
+  menuIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 13,
   },
-  menuLabel: { ...typography.body, color: colors.gray[900], flex: 1 },
-  settingItem: {
+  menuTextBox: {
+    flex: 1,
+    marginRight: 8,
+  },
+  menuTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.gray[800],
+    marginBottom: 2,
+  },
+  menuSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[500],
+  },
+  itemDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginLeft: 66,
+  },
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fef2f2',
     borderWidth: 1,
-    borderColor: colors.gray[200],
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    borderColor: '#fecaca',
+    paddingVertical: 13,
+    borderRadius: 16,
+    marginTop: 24,
   },
-  settingLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-  dangerItem: { borderColor: colors.red[100], backgroundColor: '#FFF5F5' },
-  dangerIcon: { backgroundColor: '#FEE2E2' },
-  dangerText: { color: colors.red[600] },
-  logout: { marginTop: spacing.xl },
+  logoutBtnText: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#dc2626',
+  },
+  versionText: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.gray[400],
+    marginTop: 16,
+    marginBottom: 8,
+  },
 });

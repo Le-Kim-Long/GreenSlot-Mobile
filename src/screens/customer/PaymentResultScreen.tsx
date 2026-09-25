@@ -11,6 +11,7 @@ import { CheckCircle, XCircle, Clock, ChevronRight } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { typography, spacing, radius } from '../../theme/typography';
 import type { CustomerStackProps } from '../../navigation/types';
+import { showInAppNotification } from '../../components/common/InAppNotificationBanner';
 
 const AUTO_NAVIGATE_DELAY = 3000; // 3 giây
 
@@ -76,20 +77,55 @@ export default function PaymentResultScreen({
   const params = route.params ?? {};
   const isSuccess = params.status === 'success' || (params as any).responseCode === '00' || (params as any).vnp_ResponseCode === '00';
   const status: PaymentStatus = isSuccess ? 'success' : (params.status === 'failed' ? 'failed' : 'pending');
-  const { slotNumber, amount, txnRef, orderInfo, type } = params;
+  const { slotNumber, amount, txnRef, orderInfo, type, rentalId, rental } = params;
   const isTreePayment = type === 'tree';
+  const isAddPillar = type === 'add_pillar';
+  const isExtend = type === 'extend';
 
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const Icon = config.icon;
 
-  // Override content for tree planting payments
-  const displayTitle = isTreePayment && isSuccess ? '🌱 Thanh toán phôi giống thành công!' : config.title;
-  const displaySubtitle = isTreePayment && isSuccess
-    ? 'Thanh toán mua phôi giống thành công. Yêu cầu trồng cây của bạn đã được ghi nhận và đang chờ nhà vườn phê duyệt.'
-    : isTreePayment && status === 'failed'
-      ? 'Thanh toán phôi giống không thành công. Vui lòng thử lại.'
-      : config.subtitle;
-  const displayButtonLabel = isTreePayment ? 'Xem yêu cầu trồng cây' : config.buttonLabel;
+  let displayTitle = config.title;
+  let displaySubtitle = config.subtitle;
+  let displayButtonLabel = config.buttonLabel;
+
+  if (isTreePayment) {
+    if (isSuccess) {
+      displayTitle = '🌱 Thanh toán phôi giống thành công!';
+      displaySubtitle = 'Thanh toán mua phôi giống thành công. Yêu cầu trồng cây của bạn đã được ghi nhận và đang chờ nhà vườn phê duyệt.';
+      displayButtonLabel = 'Xem yêu cầu trồng cây';
+    } else if (status === 'failed') {
+      displayTitle = '❌ Thanh toán phôi giống thất bại';
+      displaySubtitle = 'Thanh toán phôi giống không thành công. Vui lòng thử lại.';
+      displayButtonLabel = 'Quay lại';
+    }
+  } else if (isAddPillar) {
+    if (isSuccess) {
+      displayTitle = '🎉 Thuê thêm trụ thành công!';
+      displaySubtitle = `Bạn đã thuê bổ sung trụ cho ô vườn ${slotNumber || ''} thành công.`;
+      displayButtonLabel = 'Xem ô vườn vừa thuê trụ';
+    } else if (status === 'failed') {
+      displayTitle = '❌ Thuê trụ không thành công';
+      displaySubtitle = 'Giao dịch thuê trụ không thành công hoặc đã bị hủy. Vui lòng thử lại.';
+      displayButtonLabel = 'Quay lại';
+    }
+  } else if (isExtend) {
+    if (isSuccess) {
+      displayTitle = '🎉 Gia hạn hợp đồng thành công!';
+      displaySubtitle = `Ô vườn ${slotNumber || ''} của bạn đã được gia hạn thời gian thuê thành công.`;
+      displayButtonLabel = 'Xem ô vườn vừa gia hạn';
+    } else if (status === 'failed') {
+      displayTitle = '❌ Gia hạn hợp đồng thất bại';
+      displaySubtitle = 'Giao dịch gia hạn không thành công hoặc đã bị hủy. Vui lòng thử lại.';
+      displayButtonLabel = 'Quay lại';
+    }
+  } else {
+    if (isSuccess) {
+      displayTitle = '🎉 Thuê ô vườn thành công!';
+      displaySubtitle = `Giao dịch đã được xác nhận. Ô vườn ${slotNumber || ''} của bạn đã sẵn sàng sử dụng.`;
+      displayButtonLabel = 'Xem chi tiết ô vườn';
+    }
+  }
 
   const [countdown, setCountdown] = useState(AUTO_NAVIGATE_DELAY / 1000);
 
@@ -119,6 +155,49 @@ export default function PaymentResultScreen({
   }, [opacityAnim, scaleAnim, slideAnim]);
 
   useEffect(() => {
+    if (isSuccess) {
+      const bannerTitle = isTreePayment
+        ? 'Thanh toán giống cây thành công 🌱'
+        : isAddPillar
+        ? 'Thuê thêm trụ thành công 🎉'
+        : isExtend
+        ? 'Gia hạn hợp đồng thành công 🎉'
+        : 'Thanh toán thành công 🎉';
+      const bannerBody = isTreePayment
+        ? 'Yêu cầu trồng cây của bạn đã được ghi nhận. Nhấn để xem chi tiết.'
+        : isAddPillar
+        ? 'Trụ mới đã được thêm vào ô vườn. Nhấn để xem chi tiết.'
+        : isExtend
+        ? 'Thời gian thuê vườn đã được kéo dài. Nhấn để xem chi tiết.'
+        : 'Giao dịch đã được xác nhận. Nhấn để xem chi tiết.';
+
+      showInAppNotification({
+        title: bannerTitle,
+        body: bannerBody,
+        variant: 'success',
+        durationMs: 5000,
+        onPress: () => {
+          if (isTreePayment) {
+            navigation.navigate('CustomerTreePlanting');
+          } else if (rental || rentalId || slotNumber) {
+            navigation.navigate('RentalDetail', { rental, rentalId, slotNumber });
+          } else {
+            navigation.navigate('Notifications');
+          }
+        },
+      });
+    } else if (status === 'failed') {
+      showInAppNotification({
+        title: 'Thanh toán không thành công ❌',
+        body: 'Giao dịch thanh toán chưa hoàn tất. Nhấn để kiểm tra lịch sử.',
+        variant: 'warning',
+        durationMs: 5000,
+        onPress: () => {
+          navigation.navigate('PaymentHistory');
+        },
+      });
+    }
+
     if (!isSuccess) return;
 
     const interval = setInterval(() => {
@@ -145,7 +224,7 @@ export default function PaymentResultScreen({
   const goToRentals = () => {
     if (isTreePayment) {
       navigation.reset({
-        index: 0,
+        index: 1,
         routes: [
           {
             name: 'CustomerTabs',
@@ -155,6 +234,27 @@ export default function PaymentResultScreen({
             },
           },
           { name: 'CustomerTreePlanting' },
+        ],
+      });
+    } else if (isSuccess && (rental || rentalId || slotNumber)) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          {
+            name: 'CustomerTabs',
+            state: {
+              routes: [{ name: 'Rentals' }],
+              index: 0,
+            },
+          },
+          {
+            name: 'RentalDetail',
+            params: {
+              rental,
+              rentalId,
+              slotNumber,
+            },
+          },
         ],
       });
     } else {
