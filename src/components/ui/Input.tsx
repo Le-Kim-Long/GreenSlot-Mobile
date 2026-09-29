@@ -7,6 +7,8 @@ import {
   TextInputProps,
   TouchableOpacity,
   ViewStyle,
+  TextStyle,
+  StyleProp,
 } from 'react-native';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
@@ -14,16 +16,19 @@ import { typography, radius, spacing } from '../../theme/typography';
 
 export interface InputProps extends TextInputProps {
   label?: string;
+  labelStyle?: StyleProp<TextStyle>;
   error?: string;
   helperText?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   isPassword?: boolean;
   containerStyle?: ViewStyle;
+  inputContainerStyle?: ViewStyle;
 }
 
 export function Input({
   label,
+  labelStyle,
   error,
   helperText,
   leftIcon,
@@ -31,6 +36,7 @@ export function Input({
   isPassword,
   style,
   containerStyle,
+  inputContainerStyle,
   onFocus,
   onBlur,
   secureTextEntry,
@@ -63,13 +69,14 @@ export function Input({
   return (
     <View style={[styles.wrapper, containerStyle]}>
       {label ? (
-        <Text style={[styles.label, error ? styles.labelError : null]}>{label}</Text>
+        <Text style={[styles.label, labelStyle, error ? styles.labelError : null]}>{label}</Text>
       ) : null}
       <TouchableOpacity
         activeOpacity={1}
         onPress={handleContainerPress}
         style={[
           styles.inputContainer,
+          inputContainerStyle,
           isFocused && styles.inputFocused,
           error ? styles.inputError : null,
         ]}

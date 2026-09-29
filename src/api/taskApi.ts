@@ -51,9 +51,20 @@ export const taskApi = {
   reportIssue: (taskId: number, data: IssueReportRequestDTO): Promise<GardeningTaskResponseDTO> =>
     apiClient.post(`/tasks/${taskId}/report-issue`, data).then(r => r.data),
 
-  uploadEvidenceImage: (file: any): Promise<string> => {
+  uploadEvidenceImage: (uriOrFile: any): Promise<string> => {
     const formData = new FormData();
-    formData.append('file', file);
+    if (typeof uriOrFile === 'string') {
+      const filename = uriOrFile.split('/').pop() || `evidence_${Date.now()}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase()}` : 'image/jpeg';
+      formData.append('file', {
+        uri: uriOrFile,
+        name: filename,
+        type,
+      } as any);
+    } else {
+      formData.append('file', uriOrFile);
+    }
     return apiClient.post('/images/upload/evidence', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

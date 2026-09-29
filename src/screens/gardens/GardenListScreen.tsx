@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, ChevronDown, ChevronRight, Grid3X3, MapPin, Search, SlidersHorizontal, Sprout } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Bell, Check, ChevronDown, ChevronRight, Grid3X3, MapPin, Search, SlidersHorizontal, Sprout } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { locationApi } from '../../api/locationApi';
+import { notificationApi } from '../../api/notificationApi';
 import type { AvailableSlotDTO, LocationDTO } from '../../types/api';
 import { formatCurrency } from '../../utils/bookingAdapter';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -30,6 +32,26 @@ export default function GardenListScreen({ navigation }: CustomerTabProps<'Garde
   const [maxPrice, setMaxPrice] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      const fetchUnread = async () => {
+        try {
+          const res = await notificationApi.getUnreadCount();
+          if (mounted && typeof res?.unreadCount === 'number') setUnreadCount(res.unreadCount);
+        } catch {
+          try {
+            const list = await notificationApi.getMyNotifications();
+            if (mounted && Array.isArray(list)) setUnreadCount(list.filter(n => !n.isRead).length);
+          } catch { /* ignore */ }
+        }
+      };
+      void fetchUnread();
+      return () => { mounted = false; };
+    }, [])
+  );
 
   const load = useCallback(async () => {
     try {
@@ -47,13 +69,27 @@ export default function GardenListScreen({ navigation }: CustomerTabProps<'Garde
     });
   }, [slots, search, maxPrice]);
 
+  if (loading) return <LoadingScreen />;
   const parentNav = navigation.getParent();
   const selectedLocation = locations.find(location => location.id === locationId);
-  if (loading) return <LoadingScreen />;
   return <SafeAreaView style={styles.safe} edges={['top']}>
     <View style={styles.header}>
       <View style={styles.eyebrow}><Sprout size={14} color={colors.green[700]} /><Text style={styles.eyebrowText}>HỆ THỐNG CƠ SỞ GREENSLOT</Text></View>
-      <Text style={styles.title}>Chọn cơ sở & thuê ô vườn</Text>
+      <View style={styles.headerTitleRow}>
+        <Text style={styles.title}>Chọn cơ sở & thuê ô vườn</Text>
+        <TouchableOpacity
+          style={styles.bellButton}
+          onPress={() => parentNav?.navigate('Notifications')}
+          activeOpacity={0.7}
+        >
+          <Bell size={20} color={colors.gray[700]} />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
       <Text style={styles.subtitle}>Lựa chọn cơ sở gần bạn và đặt thuê ô vườn thông minh theo nhu cầu</Text>
     </View>
     <Text style={styles.sectionLabel}>CHỌN CƠ SỞ VƯỜN</Text>
@@ -102,5 +138,5 @@ const styles = StyleSheet.create({
   locationOptionActive: { backgroundColor: colors.green[50] },
   locationOptionText: { ...typography.bodySmall, color: colors.gray[700], flex: 1 },
   locationOptionTextActive: { color: colors.green[700], fontFamily: 'Inter_600SemiBold' },
-  safe: { flex: 1, backgroundColor: '#f8fafb' }, header: { backgroundColor: colors.white, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray[100] }, eyebrow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.green[50], borderColor: colors.green[200], borderWidth: 1, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4, marginBottom: spacing.sm }, eyebrowText: { ...typography.caption, color: colors.green[700], fontFamily: 'Inter_600SemiBold', fontSize: 10 }, title: { ...typography.heading1, color: colors.gray[900], fontSize: 25 }, subtitle: { ...typography.bodySmall, color: colors.gray[500], marginTop: 3 }, sectionLabel: { ...typography.caption, color: colors.gray[600], fontFamily: 'Inter_700Bold', marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.xs }, chips: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.sm, alignItems: 'center' }, chip: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.gray[200], backgroundColor: colors.white, borderRadius: radius.lg, paddingHorizontal: spacing.md }, chipActive: { backgroundColor: colors.green[600], borderColor: colors.green[600] }, chipText: { ...typography.caption, color: colors.gray[700], fontFamily: 'Inter_600SemiBold' }, chipTextActive: { color: colors.white }, chipCount: { ...typography.caption, color: colors.green[700], backgroundColor: colors.green[50], paddingHorizontal: 5, borderRadius: radius.full }, chipCountActive: { color: colors.green[700], backgroundColor: colors.white }, toolbar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.white, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray[100] }, searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.green[200], borderRadius: radius.md, paddingHorizontal: spacing.sm, backgroundColor: colors.white }, searchInput: { flex: 1, color: colors.gray[900], paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: 12 }, filterButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.gray[300], borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 11 }, filterText: { ...typography.caption, color: colors.gray[700], fontFamily: 'Inter_600SemiBold' }, resultRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }, resultText: { ...typography.bodySmall, color: colors.gray[600] }, resultStrong: { color: colors.gray[900], fontFamily: 'Inter_700Bold' }, filterHint: { ...typography.caption, color: colors.green[700] }, list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl }, columns: { justifyContent: 'space-between' }, card: { width: '48%', minWidth: 0, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.gray[200], padding: spacing.md, marginBottom: spacing.sm, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 5, elevation: 2 }, cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }, iconBox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: colors.green[50], borderWidth: 1, borderColor: colors.green[100] }, availableBadge: { maxWidth: '66%', backgroundColor: colors.green[100], borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 4 }, availableText: { ...typography.caption, color: colors.green[700], fontSize: 9, fontFamily: 'Inter_700Bold' }, cardTitle: { ...typography.heading3, color: colors.gray[900], fontSize: 16, marginBottom: spacing.xs }, tagRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: spacing.sm }, greenTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.green[50], borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 3, flexShrink: 1 }, greenTagText: { ...typography.caption, color: colors.green[700], fontSize: 9, fontFamily: 'Inter_600SemiBold' }, grayTag: { ...typography.caption, color: colors.gray[600], backgroundColor: colors.gray[100], paddingHorizontal: 5, paddingVertical: 3, borderRadius: radius.full, fontSize: 9 }, locationBox: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.gray[50], borderRadius: radius.md, padding: spacing.sm }, locationText: { ...typography.caption, color: colors.gray[700], flex: 1 }, cardDivider: { height: 1, backgroundColor: colors.gray[100], marginVertical: spacing.md }, priceCaption: { ...typography.caption, color: colors.gray[400], fontSize: 9 }, priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }, price: { ...typography.heading3, color: colors.green[700], fontSize: 16 }, per: { ...typography.caption, color: colors.gray[400], fontFamily: 'Inter_400Regular' }, arrow: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.green[50], alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: '#f8fafb' }, header: { backgroundColor: colors.white, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray[100] }, eyebrow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.green[50], borderColor: colors.green[200], borderWidth: 1, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4, marginBottom: spacing.sm }, eyebrowText: { ...typography.caption, color: colors.green[700], fontFamily: 'Inter_600SemiBold', fontSize: 10 }, headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }, title: { ...typography.heading1, color: colors.gray[900], fontSize: 25, flex: 1 }, subtitle: { ...typography.bodySmall, color: colors.gray[500], marginTop: 3 }, bellButton: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.gray[100] }, badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' }, badgeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' }, sectionLabel: { ...typography.caption, color: colors.gray[600], fontFamily: 'Inter_700Bold', marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.xs }, chips: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.sm, alignItems: 'center' }, chip: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.gray[200], backgroundColor: colors.white, borderRadius: radius.lg, paddingHorizontal: spacing.md }, chipActive: { backgroundColor: colors.green[600], borderColor: colors.green[600] }, chipText: { ...typography.caption, color: colors.gray[700], fontFamily: 'Inter_600SemiBold' }, chipTextActive: { color: colors.white }, chipCount: { ...typography.caption, color: colors.green[700], backgroundColor: colors.green[50], paddingHorizontal: 5, borderRadius: radius.full }, chipCountActive: { color: colors.green[700], backgroundColor: colors.white }, toolbar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.white, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray[100] }, searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.green[200], borderRadius: radius.md, paddingHorizontal: spacing.sm, backgroundColor: colors.white }, searchInput: { flex: 1, color: colors.gray[900], paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: 12 }, filterButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.gray[300], borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 11 }, filterText: { ...typography.caption, color: colors.gray[700], fontFamily: 'Inter_600SemiBold' }, resultRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }, resultText: { ...typography.bodySmall, color: colors.gray[600] }, resultStrong: { color: colors.gray[900], fontFamily: 'Inter_700Bold' }, filterHint: { ...typography.caption, color: colors.green[700] }, list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl }, columns: { justifyContent: 'space-between' }, card: { width: '48%', minWidth: 0, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.gray[200], padding: spacing.md, marginBottom: spacing.sm, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 5, elevation: 2 }, cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }, iconBox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: colors.green[50], borderWidth: 1, borderColor: colors.green[100] }, availableBadge: { maxWidth: '66%', backgroundColor: colors.green[100], borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 4 }, availableText: { ...typography.caption, color: colors.green[700], fontSize: 9, fontFamily: 'Inter_700Bold' }, cardTitle: { ...typography.heading3, color: colors.gray[900], fontSize: 16, marginBottom: spacing.xs }, tagRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: spacing.sm }, greenTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.green[50], borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 3, flexShrink: 1 }, greenTagText: { ...typography.caption, color: colors.green[700], fontSize: 9, fontFamily: 'Inter_600SemiBold' }, grayTag: { ...typography.caption, color: colors.gray[600], backgroundColor: colors.gray[100], paddingHorizontal: 5, paddingVertical: 3, borderRadius: radius.full, fontSize: 9 }, locationBox: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.gray[50], borderRadius: radius.md, padding: spacing.sm }, locationText: { ...typography.caption, color: colors.gray[700], flex: 1 }, cardDivider: { height: 1, backgroundColor: colors.gray[100], marginVertical: spacing.md }, priceCaption: { ...typography.caption, color: colors.gray[400], fontSize: 9 }, priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }, price: { ...typography.heading3, color: colors.green[700], fontSize: 16 }, per: { ...typography.caption, color: colors.gray[400], fontFamily: 'Inter_400Regular' }, arrow: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.green[50], alignItems: 'center', justifyContent: 'center' },
 });

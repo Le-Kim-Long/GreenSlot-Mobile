@@ -22,6 +22,8 @@ export interface User {
   roles?: string[];
   enabled?: boolean;
   createdAt?: string;
+  locationId?: number;
+  locationName?: string;
 }
 
 export interface ProfileResponseDTO {
@@ -56,6 +58,8 @@ export interface JwtResponse {
   email: string;
   fullName: string;
   roles: string[];
+  locationId?: number;
+  locationName?: string;
 }
 
 export interface PillarDetail {
@@ -66,6 +70,7 @@ export interface PillarDetail {
   pillarTypeName?: string;
   capacityHoles?: number;
   price?: number;
+  monthlyPrice?: number;
   requiredArea?: number;
   defaultTreeId?: number;
   defaultTreeName?: string;
@@ -79,6 +84,9 @@ export interface PillarDetail {
   slotNumber?: string;
   isRented?: boolean;
   isAvailable?: boolean;
+  treeName?: string;
+  expectedHarvestDate?: string;
+  expectedHarvestAt?: string;
 }
 
 export type PillarInfo = PillarDetail;
@@ -87,6 +95,8 @@ export interface AvailableSlotResponseDTO {
   id: number;
   slotNumber: string;
   price: number;
+  /** Giá thuê đất thuần (không bao gồm trụ). Backend trả field landPrice. */
+  landPrice?: number;
   area?: number;
   maxPillars?: number;
   status: string;
@@ -130,6 +140,34 @@ export interface ExtensionRequestDTO {
   durationInMonths: number;
   isMobile?: boolean;
   mobileRedirectUrl?: string;
+  redirectUrl?: string;
+}
+
+export interface AddPillarsRequestDTO {
+  smallCount?: number;
+  mediumCount?: number;
+  largeCount?: number;
+  isMobile?: boolean;
+  redirectUrl?: string;
+}
+
+export interface AddPillarsPreviewDTO {
+  rentalId: number;
+  slotNumber: string;
+  daysRemaining: number;
+  slotTotalArea: number;
+  currentUsedArea: number;
+  availableArea: number;
+  requestedArea: number;
+  remainingAreaAfter: number;
+  smallCount: number;
+  mediumCount: number;
+  largeCount: number;
+  totalPillars: number;
+  monthlyPillarsPrice: number;
+  totalAmount: number;
+  canAdd: boolean;
+  message: string;
 }
 
 export interface PaymentTransactionInfo {
@@ -138,6 +176,10 @@ export interface PaymentTransactionInfo {
   vnpTxnRef: string;
   paymentDate: string;
   status: string;
+  targetPillarCode?: string;
+  targetPillarHoles?: number;
+  treeName?: string;
+  pillarsCount?: number;
 }
 
 export interface RentalHistoryDTO {
@@ -156,6 +198,9 @@ export interface RentalHistoryDTO {
   treeName?: string;
   cropStatus?: string;
   monthlyPrice?: number;
+  landPrice?: number;
+  monthlyPillarsPrice?: number;
+  slotArea?: number;
   transactions: PaymentTransactionInfo[];
   harvestNotifiedAt?: string;
   harvestDecision?: string;
@@ -203,9 +248,11 @@ export interface TaskStatusUpdateDTO {
 }
 
 export interface IssueReportRequestDTO {
-  issueType: string;
+  issueType?: string;
+  issueTitle?: string;
   description: string;
   imageUrl?: string;
+  evidenceImageUrl?: string;
 }
 
 export interface GardeningTaskResponseDTO {
@@ -333,6 +380,9 @@ export interface TreeDTO {
   growthDurationDays?: number;
   minRentalDays?: number;
   price?: number;
+  priceSmall?: number;
+  priceMedium?: number;
+  priceLarge?: number;
   imageUrl?: string;
   soilMoistureMin?: number;
   soilMoistureMax?: number;
@@ -351,6 +401,9 @@ export interface TreePlantingRequestCreateDTO {
   targetPillarId?: number;
   reason: string;
   notes?: string;
+  isMobile?: boolean;
+  mobileRedirectUrl?: string;
+  redirectUrl?: string;
 }
 
 export interface TreePlantingRequestDTO {
@@ -370,12 +423,26 @@ export interface TreePlantingRequestDTO {
   reason: string;
   notes?: string;
   price?: number;
+  amount?: number;
+  isPaid?: boolean;
   paymentUrl?: string;
   rejectReason?: string; // populated by backend when status=REJECTED
   requestedAt: string;
   processedAt?: string;
   processedById?: number;
   processedByName?: string;
+}
+
+export interface EligibleHarvestRental {
+  rentalId: number;
+  pillarId?: number;
+  pillarCode?: string;
+  slotNumber: string;
+  treeName: string;
+  plantedAt?: string;
+  pillarCodes?: string;
+  harvestDays?: number;
+  daysGrown?: number;
 }
 
 export interface LocationDTO {
@@ -550,6 +617,9 @@ export interface BookingHistory {
   endTime?: string;
   totalPrice: number;
   monthlyPrice?: number;
+  landPrice?: number;
+  monthlyPillarsPrice?: number;
+  slotArea?: number;
   status: string;
   paymentStatus?: string;
   treeId?: number;
@@ -558,6 +628,8 @@ export interface BookingHistory {
   transactions: PaymentTransactionInfo[];
   harvestNotifiedAt?: string;
   harvestDecision?: string;
+  plantedAt?: string;
+  expectedHarvestAt?: string;
 }
 
 export type ServiceType = ServiceTypeDTO;
@@ -568,3 +640,5 @@ export type ServiceRequest = ServiceRequestDTO;
 export type BookingRequest = BookingRequestDTO;
 export type BookingResponse = BookingResponseDTO;
 export type ExtensionRequest = ExtensionRequestDTO;
+export type AddPillarsRequest = AddPillarsRequestDTO;
+export type AddPillarsPreview = AddPillarsPreviewDTO;

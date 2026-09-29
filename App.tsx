@@ -14,9 +14,12 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { AuthProvider } from './src/context/AuthContext';
+import { AlertProvider } from './src/context/AlertContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { LoadingScreen } from './src/components/ui/LoadingScreen';
 import { setupNotificationListeners } from './src/utils/notificationHelper';
+import { InAppNotificationProvider } from './src/components/common/InAppNotificationBanner';
+import { navigationRef } from './src/navigation/navigationRef';
 import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync();
@@ -63,7 +66,6 @@ export default function App() {
         Customer: {
           screens: {
             CustomerTabs: '',
-            PaymentResult: 'payment-result',
           },
         },
       },
@@ -72,12 +74,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider onLayout={onLayoutRootView}>
-      <AuthProvider>
-        <NavigationContainer linking={linking as any}>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <AlertProvider>
+        <AuthProvider>
+          <NavigationContainer ref={navigationRef} linking={linking as any}>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </NavigationContainer>
+          <InAppNotificationProvider />
+        </AuthProvider>
+      </AlertProvider>
     </SafeAreaProvider>
   );
 }

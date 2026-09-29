@@ -92,9 +92,9 @@ export default function HomeScreen({ navigation }: CustomerTabProps<'Home'>) {
               key={i}
               style={styles.featureCard}
               onPress={() => {
-                if (i === 0) navigation.navigate('Gardens');
-                else if (i === 1) navigation.navigate('IoTMonitoring');
-                else navigation.navigate('CareServices');
+                if (i === 0) (navigation.navigate as any)('Gardens');
+                else if (i === 1) (navigation.navigate as any)('IoTMonitoring');
+                else (navigation.navigate as any)('CareServices');
               }}
             >
               <View style={[styles.featureIcon, { backgroundColor: f.bg }]}>

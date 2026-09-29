@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
-import type { AvailableSlotDTO, BookingHistory, ActiveRentalDTO } from '../types/api';
+import type { AvailableSlotDTO, BookingHistory, ActiveRentalDTO, AlertDTO } from '../types/api';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -20,9 +20,10 @@ export type CustomerTabParamList = {
 export type CustomerStackParamList = {
   CustomerTabs: undefined;
   GardenDetail: { slot: AvailableSlotDTO };
-  RentalDetail: { rental: BookingHistory };
+  RentalDetail: { rental?: BookingHistory; rentalId?: number; slotNumber?: string };
   IoTMonitoring: undefined;
-  CareServices: undefined;
+  IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
+  Camera: undefined;
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
   Notifications: undefined;
@@ -31,7 +32,9 @@ export type CustomerStackParamList = {
   HarvestHistory?: undefined;
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
+    type?: 'rental' | 'tree' | 'add_pillar' | 'extend';
     rentalId?: number;
+    rental?: BookingHistory;
     slotNumber?: string;
     amount?: string;
     txnRef?: string;
@@ -41,8 +44,8 @@ export type CustomerStackParamList = {
 
 export type GardenStaffTabParamList = {
   GardenStaffDashboard: undefined;
-  TaskManagement: undefined;
-  StaffList: undefined;
+  StaffMySchedule: undefined;
+  GardenStaffPumpControl: undefined;
   Account: undefined;
 };
 
@@ -50,8 +53,14 @@ export type GardenStaffStackParamList = {
   GardenStaffTabs: undefined;
   TaskDetail: { taskId: number };
   IoTMonitoring: undefined;
+  IoTDetail: { slotId: number; pillarId?: number; pillarCode?: string };
   GardenStaffAlert: undefined;
+  GardenStaffAlertProcess: { alert: AlertDTO };
   IoTOperations: undefined;
+  StaffMySchedule: undefined;
+  GardenStaffPumpControl: undefined;
+  GardenStaffHarvestHistory: undefined;
+  GardenStaffCamera: undefined;
 };
 
 export type StaffTabParamList = {

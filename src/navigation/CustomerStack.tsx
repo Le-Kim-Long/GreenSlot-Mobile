@@ -4,7 +4,8 @@ import { CustomerTabs } from './CustomerTabs';
 import GardenDetailScreen from '../screens/gardens/GardenDetailScreen';
 import RentalDetailScreen from '../screens/customer/RentalDetailScreen';
 import IoTMonitoringScreen from '../screens/customer/IoTMonitoringScreen';
-import CareServicesScreen from '../screens/customer/CareServicesScreen';
+import IoTDetailScreen from '../screens/customer/IoTDetailScreen';
+import CameraScreen from '../screens/customer/CameraScreen';
 import PaymentHistoryScreen from '../screens/customer/PaymentHistoryScreen';
 import CustomerDashboardScreen from '../screens/customer/CustomerDashboardScreen';
 import CustomerNotificationsScreen from '../screens/customer/CustomerNotificationsScreen';
@@ -30,7 +31,8 @@ export function CustomerStack() {
       <Stack.Screen name="GardenDetail" component={GardenDetailScreen} options={{ title: 'Chi tiết ô vườn' }} />
       <Stack.Screen name="RentalDetail" component={RentalDetailScreen} options={{ title: 'Chi tiết vườn thuê' }} />
       <Stack.Screen name="IoTMonitoring" component={IoTMonitoringScreen} options={{ title: 'Giám sát IoT' }} />
-      <Stack.Screen name="CareServices" component={CareServicesScreen} options={{ title: 'Dịch vụ chăm sóc' }} />
+      <Stack.Screen name="IoTDetail" component={IoTDetailScreen} options={{ title: 'Chi tiết cảm biến' }} />
+      <Stack.Screen name="Camera" component={CameraScreen} options={{ title: 'Camera giám sát' }} />
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Lịch sử thanh toán' }} />
       <Stack.Screen name="CustomerDashboard" component={CustomerDashboardScreen} options={{ title: 'Bảng điều khiển' }} />
       <Stack.Screen name="Notifications" component={CustomerNotificationsScreen} options={{ headerShown: false }} />

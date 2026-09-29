@@ -2,6 +2,8 @@ import apiClient from './client';
 import { mapRentalHistoryList } from '../utils/bookingAdapter';
 import { getMobileRedirectUrl } from '../utils/paymentFlow';
 import type {
+  AddPillarsPreviewDTO,
+  AddPillarsRequestDTO,
   AvailableSlotResponseDTO,
   BookingHistory,
   BookingRequestDTO,
@@ -26,8 +28,32 @@ export const bookingApi = {
       .get<RentalHistoryDTO[]>('/bookings/history')
       .then(r => mapRentalHistoryList(r.data)),
 
-  extendBooking: (data: ExtensionRequestDTO): Promise<BookingResponseDTO> =>
-    apiClient.post<BookingResponseDTO>('/bookings/extend', data).then(r => r.data),
+  extendBooking: (data: ExtensionRequestDTO): Promise<BookingResponseDTO> => {
+    const payload: ExtensionRequestDTO = {
+      ...data,
+      isMobile: true,
+      redirectUrl: data.redirectUrl || data.mobileRedirectUrl || getMobileRedirectUrl(),
+      mobileRedirectUrl: data.mobileRedirectUrl || getMobileRedirectUrl(),
+    };
+    return apiClient.post<BookingResponseDTO>('/bookings/extend', payload).then(r => r.data);
+  },
+
+  previewAddPillars: (
+    rentalId: number,
+    params?: { smallCount?: number; mediumCount?: number; largeCount?: number }
+  ): Promise<AddPillarsPreviewDTO> =>
+    apiClient
+      .get<AddPillarsPreviewDTO>(`/bookings/${rentalId}/add-pillars/preview`, { params })
+      .then(r => r.data),
+
+  addPillars: (rentalId: number, data: AddPillarsRequestDTO): Promise<BookingResponseDTO> => {
+    const payload: AddPillarsRequestDTO = {
+      ...data,
+      isMobile: true,
+      redirectUrl: data.redirectUrl || getMobileRedirectUrl(),
+    };
+    return apiClient.post<BookingResponseDTO>(`/bookings/${rentalId}/add-pillars`, payload).then(r => r.data);
+  },
 
   cancelBooking: (rentalId: number): Promise<{ message: string }> =>
     apiClient.patch<{ message: string }>(`/bookings/${rentalId}/cancel`).then(r => r.data),

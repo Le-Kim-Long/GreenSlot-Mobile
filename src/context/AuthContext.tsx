@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<string | true>;
   logout: () => Promise<void>;
   register: (username: string, name: string, email: string, password: string, phone?: string, address?: string) => Promise<string | true>;
+  loginWithGoogle: (idToken: string, mode?: 'login' | 'register') => Promise<string | true>;
   loginWithJwtData: (data: import('../types/api').JwtResponse) => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -69,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.email,
           role,
           createdAt: new Date().toISOString(),
+          locationId: data.locationId,
+          locationName: data.locationName,
         };
 
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(loggedUser));
@@ -78,6 +81,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return 'Không nhận được mã xác thực từ máy chủ';
     } catch (error: unknown) {
       return getApiErrorMessage(error, 'Tên đăng nhập hoặc mật khẩu không chính xác');
+    }
+  };
+
+  const loginWithGoogle = async (idToken: string, mode: 'login' | 'register' = 'login'): Promise<string | true> => {
+    try {
+      const data = await authApi.googleLogin({ idToken, mode });
+      if (data?.token) {
+        await loginWithJwtData(data);
+        return true;
+      }
+      return 'Không nhận được mã xác thực từ máy chủ';
+    } catch (err: unknown) {
+      console.warn('Google login request failed:', err);
+      return getApiErrorMessage(err, 'Đăng nhập Google không thành công.');
     }
   };
 
@@ -113,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.email,
       role,
       createdAt: new Date().toISOString(),
+      locationId: data.locationId,
+      locationName: data.locationName,
     };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(loggedUser));
     setUser(loggedUser);
@@ -126,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         register,
+        loginWithGoogle,
         loginWithJwtData,
         isAuthenticated: !!user,
       }}

@@ -70,15 +70,24 @@ export async function openAndWaitForPayment(
 ) {
   const callback = await openPaymentSession(paymentUrl);
 
-  // Regardless of whether browser returned a custom scheme or user dismissed browser,
-  // attempt immediate confirmation with backend.
-  try {
-    const { bookingApi } = await import('../api/bookingApi');
-    await bookingApi.confirmPayment(rentalId);
-  } catch {
-    // Ignore if already activated or in progress
+  // If the user closed/dismissed the browser without completing payment,
+  // callback will be null. Do NOT confirm payment — return cancelled immediately.
+  if (!callback) {
+    try { await WebBrowser.dismissBrowser(); } catch { /* already closed */ }
+    return {
+      rental: undefined,
+      status: 'failed' as const,
+      callback: null,
+    };
   }
 
+  // If VNPay explicitly returned a failure code, return failed immediately.
+  if (callback.status !== 'success') {
+    try { await WebBrowser.dismissBrowser(); } catch { /* already closed */ }
+    return { rental: undefined, status: callback.status, callback } as const;
+  }
+
+  // VNPay returned success — poll backend to confirm the IPN has been processed.
   const settled = await waitForPayment(getHistory, rentalId, 20);
   try { await WebBrowser.dismissBrowser(); } catch { /* already closed */ }
 
@@ -86,12 +95,8 @@ export async function openAndWaitForPayment(
     return {
       rental: settled.rental,
       status: 'success' as const,
-      callback: callback || { status: 'success' },
+      callback,
     };
-  }
-
-  if (callback && callback.status !== 'success') {
-    return { rental: undefined, status: callback.status, callback } as const;
   }
 
   return {
