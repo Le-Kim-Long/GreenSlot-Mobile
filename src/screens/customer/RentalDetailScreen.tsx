@@ -26,6 +26,8 @@ import {
   Layers,
   PlusCircle,
   Wifi,
+  Zap,
+  CheckCircle,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -106,18 +108,24 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
     try {
       await bookingApi.recordHarvestDecision(rental.id, decision);
       setRental(prev => prev ? { ...prev, harvestDecision: decision } : null);
-      Alert.alert(
-        'Thành công',
-        decision === 'SELF'
-          ? 'Đã ghi nhận! Bạn có thể đến vườn tự tay thu hoạch rau sạch.'
-          : 'Đã gửi yêu cầu! Nhân viên làm vườn sẽ sớm hỗ trợ thu hoạch và bàn giao cho bạn.'
-      );
+      if (decision === 'SELF') {
+        Alert.alert(
+          'Đã ghi nhận! 🌾',
+          'Bạn đã chọn tự thu hoạch. Dữ liệu đã được lưu vào lịch sử thu hoạch.'
+        );
+      } else {
+        Alert.alert(
+          'Đã gửi yêu cầu! ✅',
+          'Nhân viên sẽ tiến hành thu hoạch và bàn giao cho bạn trong thời gian sớm nhất.'
+        );
+      }
     } catch (err: any) {
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể ghi nhận quyết định thu hoạch.');
     } finally {
       setDecidingHarvest(false);
     }
   };
+
 
   useEffect(() => {
     if (!rental && (rentalId || slotNumber)) {
@@ -1433,7 +1441,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: radius.lg,
     backgroundColor: colors.white,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.green[600],
     alignItems: 'center',
     justifyContent: 'center',
@@ -1445,6 +1453,7 @@ const styles = StyleSheet.create({
   },
   btnHarvestStaff: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: 10,
     borderRadius: radius.lg,
     backgroundColor: colors.green[600],
@@ -1462,7 +1471,7 @@ const styles = StyleSheet.create({
   harvestWaitingCard: {
     backgroundColor: '#eff6ff',
     borderRadius: radius.xl,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#bfdbfe',
     padding: spacing.md,
     marginBottom: spacing.md,

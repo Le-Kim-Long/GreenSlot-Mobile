@@ -274,6 +274,24 @@ export interface GardeningTaskResponseDTO {
   targetSlotNumber?: string;
   createdAt: string;
   rejectionReason?: string;
+  // Early harvest & crop info
+  isEarlyHarvest?: boolean;
+  pillarCodes?: string;
+  treeName?: string;
+  daysGrown?: number;
+  harvestDays?: number;
+}
+
+export interface EligibleHarvestRental {
+  rentalId: number;
+  pillarId?: number;
+  pillarCode?: string;
+  pillarCodes?: string;
+  slotNumber: string;
+  treeName: string;
+  plantedAt?: string;
+  harvestDays?: number;
+  daysGrown?: number;
 }
 
 export interface SensorReadingResponseDTO {
