@@ -1,6 +1,7 @@
 import apiClient from './client';
 import type {
   GardeningTaskResponseDTO,
+  EligibleHarvestRental,
   IssueReportRequestDTO,
   ServiceRequestDTO,
   ServiceTypeDTO,
@@ -35,8 +36,15 @@ export const taskApi = {
 
   claimTask: (taskId: number) => apiClient.post(`/tasks/${taskId}/claim`).then(r => r.data),
   notifyHarvest: (taskId: number) => apiClient.post(`/tasks/${taskId}/notify-harvest`).then(r => r.data),
-  getEligibleHarvestRentals: () => apiClient.get('/tasks/harvest/eligible-rentals').then(r => r.data),
-  reportEarlyHarvest: (data: unknown) => apiClient.post('/tasks/harvest/early', data).then(r => r.data),
+
+  // Lấy danh sách trụ/cây trồng đủ điều kiện báo thu hoạch sớm (cùng cơ sở với staff)
+  getEligibleEarlyHarvestRentals: (): Promise<EligibleHarvestRental[]> =>
+    apiClient.get('/tasks/harvest/eligible-rentals').then(r => r.data),
+
+  // Gửi đề xuất thu hoạch sớm lên Location Manager
+  notifyEarlyHarvest: (payload: { rentalId: number; pillarId?: number; pillarCode?: string }): Promise<GardeningTaskResponseDTO> => {
+    return apiClient.post('/tasks/harvest/early', payload).then(r => r.data);
+  },
 
   updateTaskStatus: (taskId: number, dataOrStatus: TaskStatusUpdateDTO | string, evidenceImageUrl?: string): Promise<GardeningTaskResponseDTO> => {
     const payload: TaskStatusUpdateDTO = typeof dataOrStatus === 'string'

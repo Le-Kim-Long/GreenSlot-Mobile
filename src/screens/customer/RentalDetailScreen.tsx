@@ -24,6 +24,8 @@ import {
   Send,
   Layers,
   PlusCircle,
+  Zap,
+  CheckCircle,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -95,6 +97,37 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   const [monthsError, setMonthsError] = useState('');
   const [extending, setExtending] = useState(false);
   const [addPillarsVisible, setAddPillarsVisible] = useState(false);
+
+  // ── Harvest decision state ──────────────────────────────────────────────
+  const [decidingHarvest, setDecidingHarvest] = useState(false);
+
+  const handleHarvestDecision = async (decision: 'SELF' | 'STAFF') => {
+    if (!rental) return;
+    setDecidingHarvest(true);
+    try {
+      await bookingApi.recordHarvestDecision(rental.id, decision);
+      // Refresh rental data
+      const history = await bookingApi.getHistory();
+      const updated = history.find(r => r.id === rental.id);
+      if (updated) setRental(updated);
+      if (decision === 'SELF') {
+        Alert.alert(
+          'Đã ghi nhận! 🌾',
+          'Bạn đã chọn tự thu hoạch. Dữ liệu đã được lưu vào lịch sử thu hoạch.'
+        );
+      } else {
+        Alert.alert(
+          'Đã gửi yêu cầu! ✅',
+          'Nhân viên sẽ tiến hành thu hoạch và bàn giao cho bạn trong thời gian sớm nhất.'
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể ghi nhận lựa chọn. Vui lòng thử lại.');
+    } finally {
+      setDecidingHarvest(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!rental && (rentalId || slotNumber)) {
@@ -352,6 +385,72 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               <TriangleAlert size={14} color="#dc2626" strokeWidth={2} />
               <Text style={styles.btnIncidentText}>Báo sự cố</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── Harvest Decision Banner (Thu hoạch sớm / Lựa chọn thu hoạch) ── */}
+        {isActive && rental.harvestNotifiedAt && !rental.harvestDecision && (
+          <View style={styles.harvestNoticeCard}>
+            <View style={styles.harvestNoticeHeader}>
+              <View style={styles.harvestNoticeTitleRow}>
+                <Sprout size={18} color="#d97706" />
+                <Text style={styles.harvestNoticeTitle}>
+                  Cây {rental.treeName ? `"${rental.treeName}"` : ''} tại ô {rental.slotNumber} đã sẵn sàng thu hoạch!
+                </Text>
+              </View>
+              {rental.expectedHarvestAt && new Date(rental.expectedHarvestAt).getTime() > Date.now() && (
+                <View style={styles.earlyHarvestBadge}>
+                  <Zap size={11} color="#92400e" />
+                  <Text style={styles.earlyHarvestBadgeText}>Thu hoạch sớm</Text>
+                </View>
+              )}
+            </View>
+
+            {((rental.pillarCodes && rental.pillarCodes.length > 0) || rental.pillarCode) && (
+              <View style={styles.harvestPillarRow}>
+                <Text style={styles.harvestPillarText}>
+                  🏷️ Vị trí: Trụ {rental.pillarCodes && rental.pillarCodes.length > 0 ? rental.pillarCodes.join(', ') : rental.pillarCode}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.harvestNoticeDesc}>
+              Bạn muốn tự thu hoạch hay nhờ nhân viên hỗ trợ thu hoạch và bàn giao?
+            </Text>
+
+            <View style={styles.harvestBtnRow}>
+              <TouchableOpacity
+                disabled={decidingHarvest}
+                onPress={() => handleHarvestDecision('SELF')}
+                style={[styles.btnHarvestSelf, decidingHarvest && styles.btnDisabled]}
+              >
+                <Text style={styles.btnHarvestSelfText}>Tôi tự thu hoạch</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={decidingHarvest}
+                onPress={() => handleHarvestDecision('STAFF')}
+                style={[styles.btnHarvestStaff, decidingHarvest && styles.btnDisabled]}
+              >
+                {decidingHarvest ? (
+                  <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 4 }} />
+                ) : null}
+                <Text style={styles.btnHarvestStaffText}>Nhờ nhân viên giúp</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ── Harvest Waiting Banner (Đã chọn nhờ nhân viên giúp) ── */}
+        {isActive && rental.harvestDecision === 'STAFF' && (
+          <View style={styles.harvestStaffWaitingCard}>
+            <Clock size={18} color="#2563eb" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.harvestStaffWaitingTitle}>Đang chờ nhân viên thu hoạch</Text>
+              <Text style={styles.harvestStaffWaitingDesc}>
+                Yêu cầu đã được gửi đến nhân viên làm vườn. Lịch sử thu hoạch sẽ được cập nhật sau khi hoàn tất nghiệm thu.
+              </Text>
+            </View>
           </View>
         )}
 
@@ -1143,6 +1242,124 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.emerald[200],
     marginVertical: 4,
+  },
+
+  // ── Harvest decision banner styles ──────────────────────────────
+  harvestNoticeCard: {
+    backgroundColor: '#fffbeb', // amber-50
+    borderWidth: 1.5,
+    borderColor: '#fde68a', // amber-200
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  harvestNoticeHeader: {
+    marginBottom: spacing.xs,
+  },
+  harvestNoticeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  harvestNoticeTitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_700Bold',
+    color: '#78350f', // amber-900
+    flex: 1,
+  },
+  earlyHarvestBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    marginTop: 6,
+  },
+  earlyHarvestBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: '#92400e',
+  },
+  harvestPillarRow: {
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  harvestPillarText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#92400e',
+  },
+  harvestNoticeDesc: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: '#b45309', // amber-700
+    marginBottom: spacing.sm,
+    lineHeight: 17,
+  },
+  harvestBtnRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  btnHarvestSelf: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.green[600],
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnHarvestSelfText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[700],
+  },
+  btnHarvestStaff: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.green[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnHarvestStaffText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.white,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  harvestStaffWaitingCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: '#eff6ff', // blue-50
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe', // blue-200
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  harvestStaffWaitingTitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_700Bold',
+    color: '#1e3a8a', // blue-900
+    marginBottom: 2,
+  },
+  harvestStaffWaitingDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: '#1d4ed8', // blue-700
+    lineHeight: 16,
   },
 });
 
