@@ -83,12 +83,16 @@ export default function CustomerHarvestHistoryScreen() {
 
               <View style={[styles.infoRow, { marginTop: 4, flexWrap: 'wrap' }]}>
                 <Layers size={14} color={colors.green[700]} />
-                <Text style={styles.pillarText}>
-                  Trụ: <Text style={styles.pillarBold}>{item.pillarCodes || 'Tất cả trụ'}</Text>
-                  {item.pillarHarvestCount ? (
-                    <Text style={styles.harvestCountText}> (Thu hoạch lần {item.pillarHarvestCount})</Text>
-                  ) : null}
-                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  {(item.pillarCodes || 'Tất cả trụ').split(',').map(s => s.trim()).filter(Boolean).map((code, idx) => (
+                    <Text key={idx} style={styles.pillarText}>
+                      Trụ: <Text style={styles.pillarBold}>{code}</Text>
+                      {item.pillarHarvestCount ? (
+                        <Text style={styles.harvestCountText}> (Thu hoạch lần {item.pillarHarvestCount})</Text>
+                      ) : null}
+                    </Text>
+                  ))}
+                </View>
                 {item.isEarlyHarvest && (
                   <View style={styles.earlyHarvestBadge}>
                     <Text style={styles.earlyHarvestText}>⚡ Thu hoạch sớm</Text>

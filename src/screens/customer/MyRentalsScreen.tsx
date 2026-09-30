@@ -268,10 +268,10 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [decidingId, setDecidingId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const handleHarvestDecision = async (rentalId: number, decision: 'SELF' | 'STAFF') => {
+  const handleHarvestDecision = async (rentalId: number, decision: 'SELF' | 'STAFF', pillarCode?: string) => {
     setDecidingId(rentalId);
     try {
-      await bookingApi.recordHarvestDecision(rentalId, decision);
+      await bookingApi.recordHarvestDecision(rentalId, decision, pillarCode);
       setRentals(prev =>
         prev.map(r => (r.id === rentalId ? { ...r, harvestDecision: decision } : r))
       );
@@ -640,7 +640,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                       style={[styles.btnHarvestSelf, decidingId === item.id && styles.btnDisabled]}
                       onPress={e => {
                         e.stopPropagation?.();
-                        handleHarvestDecision(item.id, 'SELF');
+                        handleHarvestDecision(item.id, 'SELF', item.harvestPillarCode);
                       }}
                       disabled={decidingId === item.id}
                     >
@@ -651,7 +651,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                       style={[styles.btnHarvestStaff, decidingId === item.id && styles.btnDisabled]}
                       onPress={e => {
                         e.stopPropagation?.();
-                        handleHarvestDecision(item.id, 'STAFF');
+                        handleHarvestDecision(item.id, 'STAFF', item.harvestPillarCode);
                       }}
                       disabled={decidingId === item.id}
                     >
