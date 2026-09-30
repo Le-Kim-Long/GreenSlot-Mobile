@@ -24,6 +24,7 @@ import {
   Send,
   Layers,
   PlusCircle,
+  Wifi,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -318,6 +319,21 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
         {isActive && (
           <View style={[styles.card, { flexDirection: 'row', gap: spacing.xs, padding: spacing.md }]}>
             <TouchableOpacity
+              style={[styles.btnPlant, { flex: 1, margin: 0, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
+              onPress={() => {
+                const firstPillar = rental.pillars?.[0];
+                navigation.navigate('IoTDetail', {
+                  slotId: rental.slotId || rental.id,
+                  pillarId: firstPillar?.id,
+                  pillarCode: firstPillar?.pillarCode || rental.pillarCode,
+                });
+              }}
+            >
+              <Wifi size={14} color="#2563EB" />
+              <Text style={[styles.btnPlantText, { color: '#1D4ED8' }]}>Cảm biến</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.btnPlant, { flex: 1, margin: 0 }]}
               onPress={() => navigation.navigate('CustomerTreePlanting', { rentalId: rental.id } as any)}
             >
@@ -341,7 +357,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             >
               <PlusCircle size={14} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
               <Text style={[styles.btnAddPillarQuickText, availableArea < 1.0 && { color: colors.gray[400] }]}>
-                Thuê thêm trụ
+                Thuê thêm
               </Text>
             </TouchableOpacity>
 
@@ -350,7 +366,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               onPress={openIncident}
             >
               <TriangleAlert size={14} color="#dc2626" strokeWidth={2} />
-              <Text style={styles.btnIncidentText}>Báo sự cố</Text>
+              <Text style={styles.btnIncidentText}>Sự cố</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -389,14 +405,40 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                       </View>
                     )}
                   </View>
-                  <View style={[
-                    styles.pillarSizeBadge,
-                    p.pillarType === 'LARGE' ? styles.pillarSizeLarge :
-                      p.pillarType === 'SMALL' ? styles.pillarSizeSmall : styles.pillarSizeMedium,
-                  ]}>
-                    <Text style={styles.pillarSizeText}>
-                      {p.pillarTypeName ?? p.pillarType ?? 'Vừa'}
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TouchableOpacity
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        backgroundColor: '#EFF6FF',
+                        borderWidth: 1,
+                        borderColor: '#BFDBFE',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                      onPress={() => {
+                        navigation.navigate('IoTDetail', {
+                          slotId: rental.slotId || rental.id,
+                          pillarId: p.id,
+                          pillarCode: p.pillarCode,
+                        });
+                      }}
+                    >
+                      <Wifi size={12} color="#2563EB" />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>Cảm biến</Text>
+                    </TouchableOpacity>
+
+                    <View style={[
+                      styles.pillarSizeBadge,
+                      p.pillarType === 'LARGE' ? styles.pillarSizeLarge :
+                        p.pillarType === 'SMALL' ? styles.pillarSizeSmall : styles.pillarSizeMedium,
+                    ]}>
+                      <Text style={styles.pillarSizeText}>
+                        {p.pillarTypeName ?? p.pillarType ?? 'Vừa'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               );

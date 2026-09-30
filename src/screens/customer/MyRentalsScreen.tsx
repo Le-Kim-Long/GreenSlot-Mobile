@@ -32,6 +32,7 @@ import {
   MapPin,
   Layers,
   PlusCircle,
+  Wifi,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -586,6 +587,33 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                   >
                     <Sprout size={13} color={colors.green[700]} />
                     <Text style={styles.btnPlantText}>Trồng mới</Text>
+                  </TouchableOpacity>
+
+                  {/* Cảm biến IoT */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 8,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      backgroundColor: '#EFF6FF',
+                      borderWidth: 1,
+                      borderColor: '#BFDBFE',
+                    }}
+                    onPress={e => {
+                      e.stopPropagation?.();
+                      const firstPillar = item.pillars?.[0];
+                      navigation.navigate('IoTDetail', {
+                        slotId: item.slotId || item.id,
+                        pillarId: firstPillar?.id,
+                        pillarCode: firstPillar?.pillarCode || item.pillarCode,
+                      });
+                    }}
+                  >
+                    <Wifi size={13} color="#2563EB" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>Cảm biến</Text>
                   </TouchableOpacity>
 
                   {/* Thuê thêm trụ */}
