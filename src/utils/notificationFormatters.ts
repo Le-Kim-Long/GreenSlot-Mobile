@@ -418,6 +418,15 @@ export function getNotificationActionRoute(notification: NotificationResponseDTO
   }
 
   // 5. Harvest Events
+  if (t === 'HARVEST_READY') {
+    if (slotNumber || rentalId) {
+      return {
+        screen: 'RentalDetail',
+        params: { slotNumber, rentalId },
+      };
+    }
+    return { screen: 'Rentals' };
+  }
   if (t.startsWith('HARVEST_') || (t.includes('HARVEST') && (t.includes('COMPLETED') || t.includes('DONE')))) {
     return { screen: 'CustomerHarvestHistory' };
   }

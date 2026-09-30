@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -96,6 +97,27 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   const [monthsError, setMonthsError] = useState('');
   const [extending, setExtending] = useState(false);
   const [addPillarsVisible, setAddPillarsVisible] = useState(false);
+  const [decidingHarvest, setDecidingHarvest] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const handleHarvestDecision = async (decision: 'SELF' | 'STAFF') => {
+    if (!rental) return;
+    setDecidingHarvest(true);
+    try {
+      await bookingApi.recordHarvestDecision(rental.id, decision);
+      setRental(prev => prev ? { ...prev, harvestDecision: decision } : null);
+      Alert.alert(
+        'Thành công',
+        decision === 'SELF'
+          ? 'Đã ghi nhận! Bạn có thể đến vườn tự tay thu hoạch rau sạch.'
+          : 'Đã gửi yêu cầu! Nhân viên làm vườn sẽ sớm hỗ trợ thu hoạch và bàn giao cho bạn.'
+      );
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể ghi nhận quyết định thu hoạch.');
+    } finally {
+      setDecidingHarvest(false);
+    }
+  };
 
   useEffect(() => {
     if (!rental && (rentalId || slotNumber)) {
@@ -314,6 +336,99 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             <Badge label={badge.label} variant={badge.variant} />
           </View>
         </View>
+
+        {/* ── Harvest Decision Banner ─────────────────────── */}
+        {isActive && rental.harvestNotifiedAt && !rental.harvestDecision && (
+          <View style={styles.harvestBanner}>
+            <View style={styles.harvestBannerHeader}>
+              <Sprout size={18} color="#d97706" />
+              <Text style={styles.harvestBannerTitle}>
+                Cây {rental.treeName || ''} đã sẵn sàng thu hoạch!
+              </Text>
+            </View>
+
+            {rental.expectedHarvestAt && new Date(rental.expectedHarvestAt).getTime() > Date.now() && (
+              <View style={styles.earlyHarvestBadge}>
+                <Text style={styles.earlyHarvestText}>⚡ Thu hoạch sớm</Text>
+              </View>
+            )}
+
+            <View style={styles.harvestPillarRow}>
+              <Layers size={14} color="#b45309" />
+              <Text style={styles.harvestPillarText}>
+                Vị trí: <Text style={styles.harvestPillarBold}>Trụ {rental.harvestPillarCode || (rental.pillarCodes && rental.pillarCodes.length > 0 ? rental.pillarCodes.join(', ') : rental.pillarCode || 'Tất cả trụ')}</Text>
+              </Text>
+            </View>
+
+            {/* Evidence image & staff notes */}
+            {rental.harvestEvidenceImageUrl && (
+              <View style={styles.harvestEvidenceCard}>
+                <Text style={styles.harvestEvidenceLabel}>📷 Ảnh cây thực tế (Nhân viên gửi):</Text>
+                <TouchableOpacity
+                  style={styles.harvestImageWrapper}
+                  onPress={() => setPreviewImage(rental.harvestEvidenceImageUrl!)}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: rental.harvestEvidenceImageUrl }}
+                    style={styles.harvestImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.harvestImageOverlay}>
+                    <Text style={styles.harvestImageOverlayText}>🔍 Bấm để phóng to</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {rental.harvestStaffNotes && (
+                  <View style={styles.harvestNotesBox}>
+                    <Text style={styles.harvestNotesText}>
+                      <Text style={{ fontWeight: '700' }}>Ghi chú nhân viên: </Text>
+                      {rental.harvestStaffNotes}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <Text style={styles.harvestQuestion}>
+              Bạn muốn tự thu hoạch hay nhờ nhân viên hỗ trợ thu hoạch và bàn giao?
+            </Text>
+
+            <View style={styles.harvestBtnRow}>
+              <TouchableOpacity
+                style={[styles.btnHarvestSelf, decidingHarvest && styles.btnDisabled]}
+                onPress={() => handleHarvestDecision('SELF')}
+                disabled={decidingHarvest}
+              >
+                <Text style={styles.btnHarvestSelfText}>Tôi tự thu hoạch</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btnHarvestStaff, decidingHarvest && styles.btnDisabled]}
+                onPress={() => handleHarvestDecision('STAFF')}
+                disabled={decidingHarvest}
+              >
+                {decidingHarvest ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.btnHarvestStaffText}>Nhờ nhân viên giúp</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {isActive && rental.harvestDecision === 'STAFF' && (
+          <View style={styles.harvestWaitingCard}>
+            <Clock size={18} color="#2563eb" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.harvestWaitingTitle}>Đang chờ nhân viên thu hoạch</Text>
+              <Text style={styles.harvestWaitingDesc}>
+                Yêu cầu đã được gửi đến nhân viên làm vườn. Lịch sử thu hoạch sẽ được cập nhật sau khi hoàn tất nghiệm thu.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* ── Quick Actions Row ─────────────────────────── */}
         {isActive && (
@@ -776,6 +891,18 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
         </View>
       </Modal>
 
+      {/* Fullscreen Image Preview Modal */}
+      {previewImage && (
+        <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+          <View style={styles.modalBg}>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setPreviewImage(null)}>
+              <Text style={styles.modalCloseText}>✕ Đóng</Text>
+            </TouchableOpacity>
+            <Image source={{ uri: previewImage }} style={styles.modalFullImage} resizeMode="contain" />
+          </View>
+        </Modal>
+      )}
+
     </SafeAreaView>
   );
 }
@@ -1185,6 +1312,201 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.emerald[200],
     marginVertical: 4,
+  },
+  harvestBanner: {
+    backgroundColor: '#fffbeb',
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  harvestBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  harvestBannerTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: '#78350f',
+    flex: 1,
+  },
+  earlyHarvestBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  earlyHarvestText: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: '#92400e',
+  },
+  harvestPillarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: spacing.sm,
+  },
+  harvestPillarText: {
+    fontSize: 13,
+    color: '#92400e',
+    fontFamily: 'Inter_500Medium',
+  },
+  harvestPillarBold: {
+    fontFamily: 'Inter_700Bold',
+    color: '#78350f',
+  },
+  harvestEvidenceCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  harvestEvidenceLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.gray[800],
+    marginBottom: 6,
+  },
+  harvestImageWrapper: {
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    height: 160,
+    backgroundColor: colors.gray[900],
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+  },
+  harvestImage: {
+    width: '100%',
+    height: '100%',
+  },
+  harvestImageOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+  },
+  harvestImageOverlayText: {
+    color: colors.white,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  harvestNotesBox: {
+    marginTop: spacing.xs,
+    backgroundColor: '#fffbeb',
+    borderRadius: radius.sm,
+    padding: spacing.xs,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  harvestNotesText: {
+    fontSize: 12,
+    color: '#78350f',
+    lineHeight: 17,
+  },
+  harvestQuestion: {
+    fontSize: 12,
+    color: '#92400e',
+    marginBottom: spacing.sm,
+    fontFamily: 'Inter_400Regular',
+  },
+  harvestBtnRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  btnHarvestSelf: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.green[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnHarvestSelfText: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[700],
+  },
+  btnHarvestStaff: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.green[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnHarvestStaffText: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.white,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  harvestWaitingCard: {
+    backgroundColor: '#eff6ff',
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+  },
+  harvestWaitingTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: '#1e3a8a',
+    marginBottom: 2,
+  },
+  harvestWaitingDesc: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: '#1d4ed8',
+    lineHeight: 17,
+  },
+  modalBg: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    zIndex: 10,
+  },
+  modalCloseText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  modalFullImage: {
+    width: '100%',
+    height: '80%',
   },
 });
 

@@ -9,6 +9,8 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -40,6 +42,7 @@ export default function CustomerNotificationsScreen() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory>('ALL');
   const [markingAll, setMarkingAll] = useState<boolean>(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -194,6 +197,23 @@ export default function CustomerNotificationsScreen() {
             {item.message}
           </Text>
 
+          {item.imageUrl && (
+            <TouchableOpacity
+              style={styles.imageThumbnailContainer}
+              onPress={() => setPreviewImage(item.imageUrl!)}
+              activeOpacity={0.8}
+            >
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.imageThumbnail}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlayHint}>
+                <Text style={styles.imageOverlayText}>🔍 Bấm xem ảnh thực tế</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
           {actionRoute && (
             <View style={styles.actionFooter}>
               <Text style={styles.actionText}>{actionBtnLabel}</Text>
@@ -333,6 +353,16 @@ export default function CustomerNotificationsScreen() {
             </View>
           }
         />
+      )}
+      {previewImage && (
+        <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+          <View style={styles.modalBg}>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setPreviewImage(null)}>
+              <Text style={styles.modalCloseText}>✕ Đóng</Text>
+            </TouchableOpacity>
+            <Image source={{ uri: previewImage }} style={styles.modalFullImage} resizeMode="contain" />
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   );
@@ -598,5 +628,60 @@ const styles = StyleSheet.create({
     color: colors.gray[500],
     textAlign: 'center',
     lineHeight: 19,
+  },
+  imageThumbnailContainer: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    position: 'relative',
+    height: 120,
+    backgroundColor: colors.gray[100],
+  },
+  imageThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlayHint: {
+    position: 'absolute',
+    bottom: 4,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  imageOverlayText: {
+    color: colors.white,
+    fontSize: 10,
+    fontFamily: 'Inter_500Medium',
+  },
+  modalBg: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    zIndex: 10,
+  },
+  modalCloseText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  modalFullImage: {
+    width: '100%',
+    height: '80%',
   },
 });

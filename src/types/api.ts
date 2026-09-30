@@ -206,6 +206,9 @@ export interface RentalHistoryDTO {
   harvestDecision?: string;
   plantedAt?: string;
   expectedHarvestAt?: string;
+  harvestPillarCode?: string;
+  harvestEvidenceImageUrl?: string;
+  harvestStaffNotes?: string;
 }
 
 export interface HarvestHistoryItem {
@@ -215,6 +218,9 @@ export interface HarvestHistoryItem {
   locationName?: string;
   slotId?: number;
   slotNumber?: string;
+  pillarCodes?: string;
+  pillarHarvestCount?: number;
+  isEarlyHarvest?: boolean;
   treeId?: number;
   treeName?: string;
   customerId?: number;
@@ -354,6 +360,7 @@ export interface NotificationResponseDTO {
   type: string;
   referenceId?: number | null;
   actionUrl?: string | null;
+  imageUrl?: string | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -630,6 +637,9 @@ export interface BookingHistory {
   harvestDecision?: string;
   plantedAt?: string;
   expectedHarvestAt?: string;
+  harvestPillarCode?: string;
+  harvestEvidenceImageUrl?: string;
+  harvestStaffNotes?: string;
 }
 
 export type ServiceType = ServiceTypeDTO;

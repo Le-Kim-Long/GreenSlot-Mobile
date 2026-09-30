@@ -7,7 +7,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sprout, Calendar, MapPin, User, History } from 'lucide-react-native';
+import { Sprout, Calendar, MapPin, User, History, Layers } from 'lucide-react-native';
 import { harvestHistoryApi } from '../../api/harvestHistoryApi';
 import type { HarvestHistoryItem } from '../../types/api';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
@@ -79,6 +79,21 @@ export default function CustomerHarvestHistoryScreen() {
                 <Text style={styles.slotText}>
                   Ô {item.slotNumber} {item.locationName ? `· ${item.locationName}` : ''}
                 </Text>
+              </View>
+
+              <View style={[styles.infoRow, { marginTop: 4, flexWrap: 'wrap' }]}>
+                <Layers size={14} color={colors.green[700]} />
+                <Text style={styles.pillarText}>
+                  Trụ: <Text style={styles.pillarBold}>{item.pillarCodes || 'Tất cả trụ'}</Text>
+                  {item.pillarHarvestCount ? (
+                    <Text style={styles.harvestCountText}> (Thu hoạch lần {item.pillarHarvestCount})</Text>
+                  ) : null}
+                </Text>
+                {item.isEarlyHarvest && (
+                  <View style={styles.earlyHarvestBadge}>
+                    <Text style={styles.earlyHarvestText}>⚡ Thu hoạch sớm</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.divider} />
@@ -230,6 +245,33 @@ const styles = StyleSheet.create({
   staffValue: {
     fontSize: 12,
     color: '#1d4ed8',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  pillarText: {
+    fontSize: 12,
+    color: colors.gray[700],
+    fontFamily: 'Inter_500Medium',
+  },
+  pillarBold: {
+    color: colors.green[800],
+    fontFamily: 'Inter_700Bold',
+  },
+  harvestCountText: {
+    color: colors.green[700],
+    fontFamily: 'Inter_600SemiBold',
+  },
+  earlyHarvestBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  earlyHarvestText: {
+    fontSize: 10,
+    color: '#92400e',
     fontFamily: 'Inter_600SemiBold',
   },
 });
