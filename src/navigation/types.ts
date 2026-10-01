@@ -27,9 +27,17 @@ export type CustomerStackParamList = {
   PaymentHistory: undefined;
   CustomerDashboard: undefined;
   Notifications: undefined;
-  CustomerTreePlanting: undefined;
-  CustomerHarvestHistory: undefined;
-  HarvestHistory?: undefined;
+  CustomerTreePlanting?: { rentalId?: number };
+  CustomerHarvestHistory?: {
+    rentalId?: number;
+    harvestId?: number;
+    slotNumber?: string;
+  };
+  HarvestHistory?: {
+    rentalId?: number;
+    harvestId?: number;
+    slotNumber?: string;
+  };
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
     type?: 'rental' | 'tree' | 'add_pillar' | 'extend';

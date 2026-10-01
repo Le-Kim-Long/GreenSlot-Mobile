@@ -34,6 +34,8 @@ import {
   Layers,
   PlusCircle,
   Wifi,
+  Zap,
+  History,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -49,6 +51,7 @@ import type { CustomerTabProps } from '../../navigation/types';
 import { openAndWaitForPayment } from '../../utils/paymentFlow';
 import { AddPillarsModal } from '../../components/customer/AddPillarsModal';
 import { ExtendRentalModal } from '../../components/customer/ExtendRentalModal';
+import { EarlyHarvestModal } from '../../components/customer/EarlyHarvestModal';
 
 type TabKey = 'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'COMPLETED';
 
@@ -267,6 +270,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [extendTarget, setExtendTarget] = useState<BookingHistory | null>(null);
   const [decidingId, setDecidingId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [earlyHarvestTarget, setEarlyHarvestTarget] = useState<BookingHistory | null>(null);
 
   const handleHarvestDecision = async (rentalId: number, decision: 'SELF' | 'STAFF', pillarCode?: string) => {
     setDecidingId(rentalId);
@@ -497,6 +501,9 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
             currentUsedArea = 1.0;
           }
           const availableArea = Math.max(0, Number((slotArea - currentUsedArea).toFixed(1)));
+          const hasPlantedTree = Boolean(
+            item.treeName || (item.pillars && item.pillars.some(p => p.treeName))
+          );
 
           return (
             <TouchableOpacity
@@ -665,16 +672,21 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                 </View>
               )}
 
+              {/* ── Đang chờ nhân viên thu hoạch (Gọn gàng ở ngoài card, đã xóa chữ chi tiết) ── */}
               {isActive && item.harvestDecision === 'STAFF' && (
-                <View style={styles.harvestWaitingCard}>
-                  <Clock size={16} color="#2563eb" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.harvestWaitingTitle}>Đang chờ nhân viên thu hoạch</Text>
-                    <Text style={styles.harvestWaitingDesc}>
-                      Yêu cầu đã được gửi đến nhân viên làm vườn. Lịch sử thu hoạch sẽ được cập nhật sau khi hoàn tất.
-                    </Text>
+                <TouchableOpacity
+                  style={styles.harvestWaitingCompact}
+                  onPress={() => navigation.navigate('RentalDetail', { rental: item })}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.harvestWaitingCompactLeft}>
+                    <Clock size={13} color="#2563eb" />
+                    <Text style={styles.harvestWaitingCompactTitle}>Đang chờ nhân viên thu hoạch</Text>
                   </View>
-                </View>
+                  <View style={styles.harvestWaitingCompactRight}>
+                    <ChevronRight size={14} color="#2563eb" />
+                  </View>
+                </TouchableOpacity>
               )}
 
               {/* ── Action buttons: PENDING ── */}
@@ -701,90 +713,107 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
 
               {/* ── Action buttons: ACTIVE ── */}
               {isActive && (
-                <View style={styles.actionRow}>
-                  {/* Trồng cây mới */}
-                  <TouchableOpacity
-                    style={styles.btnPlant}
-                    onPress={e => {
-                      e.stopPropagation?.();
-                      navigation.navigate('CustomerTreePlanting', { rentalId: item.id } as any);
-                    }}
-                  >
-                    <Sprout size={13} color={colors.green[700]} />
-                    <Text style={styles.btnPlantText}>Trồng mới</Text>
-                  </TouchableOpacity>
+                <View style={styles.actionSection}>
+                  {/* Hàng 1: Thao tác canh tác chính (Thu hoạch sớm & Trồng mới) */}
+                  <View style={styles.actionRowMain}>
+                    {/* Thu hoạch sớm */}
+                    {item.harvestDecision !== 'STAFF' && (
+                      <TouchableOpacity
+                        style={[
+                          styles.btnEarlyHarvestPrimary,
+                          hasPlantedTree ? styles.btnEarlyHarvestActive : styles.btnEarlyHarvestDisabled,
+                        ]}
+                        onPress={e => {
+                          e.stopPropagation?.();
+                          if (!hasPlantedTree) {
+                            Alert.alert(
+                              'Chưa thể thu hoạch sớm',
+                              'Trụ cây trong ô vườn đã được thu hoạch và chưa gieo trồng cây mới. Vui lòng gieo trồng cây trước.'
+                            );
+                            return;
+                          }
+                          setEarlyHarvestTarget(item);
+                        }}
+                      >
+                        <Zap size={14} color={hasPlantedTree ? '#b45309' : colors.gray[400]} strokeWidth={hasPlantedTree ? 2.5 : 1.8} />
+                        <Text style={[styles.btnEarlyHarvestPrimaryText, !hasPlantedTree && { color: colors.gray[400] }]}>
+                          Thu hoạch sớm
+                        </Text>
+                      </TouchableOpacity>
+                    )}
 
-                  {/* Cảm biến IoT */}
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                      paddingHorizontal: 8,
-                      paddingVertical: 5,
-                      borderRadius: 8,
-                      backgroundColor: '#EFF6FF',
-                      borderWidth: 1,
-                      borderColor: '#BFDBFE',
-                    }}
-                    onPress={e => {
-                      e.stopPropagation?.();
-                      const firstPillar = item.pillars?.[0];
-                      navigation.navigate('IoTDetail', {
-                        slotId: item.slotId || item.id,
-                        pillarId: firstPillar?.id,
-                        pillarCode: firstPillar?.pillarCode || item.pillarCode,
-                      });
-                    }}
-                  >
-                    <Wifi size={13} color="#2563EB" />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>Cảm biến</Text>
-                  </TouchableOpacity>
+                    {/* Trồng cây mới */}
+                    <TouchableOpacity
+                      style={styles.btnPlantPrimary}
+                      onPress={e => {
+                        e.stopPropagation?.();
+                        navigation.navigate('CustomerTreePlanting', { rentalId: item.id } as any);
+                      }}
+                    >
+                      <Sprout size={14} color={colors.green[700]} />
+                      <Text style={styles.btnPlantPrimaryText}>Trồng mới</Text>
+                    </TouchableOpacity>
+                  </View>
 
-                  {/* Thuê thêm trụ */}
-                  <TouchableOpacity
-                    style={[styles.btnAddPillars, availableArea < 1.0 && styles.btnAddPillarsDisabled]}
-                    onPress={e => {
-                      e.stopPropagation?.();
-                      if (availableArea < 1.0) {
-                        Alert.alert('Thông báo', 'Ô vườn đã hết diện tích trống để đặt thêm trụ.');
-                        return;
-                      }
-                      setAddPillarsTarget(item);
-                    }}
-                  >
-                    <PlusCircle size={13} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
-                    <Text style={[styles.btnAddPillarsText, availableArea < 1.0 && { color: colors.gray[400] }]}>
-                      Thuê trụ
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Hàng 2: Quản lý ô vườn & Hợp đồng (Thuê trụ, Gia hạn, Chi tiết) */}
+                  <View style={styles.actionRowSub}>
+                    {/* Thuê thêm trụ */}
+                    <TouchableOpacity
+                      style={[styles.btnAddPillarsCompact, availableArea < 1.0 && styles.btnAddPillarsDisabled]}
+                      onPress={e => {
+                        e.stopPropagation?.();
+                        if (availableArea < 1.0) {
+                          Alert.alert('Thông báo', 'Ô vườn đã hết diện tích trống để đặt thêm trụ.');
+                          return;
+                        }
+                        setAddPillarsTarget(item);
+                      }}
+                    >
+                      <PlusCircle size={13} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
+                      <Text style={[styles.btnAddPillarsCompactText, availableArea < 1.0 && { color: colors.gray[400] }]}>
+                        Thuê trụ
+                      </Text>
+                    </TouchableOpacity>
 
-                  {/* Gia hạn */}
-                  <TouchableOpacity
-                    style={styles.btnExtend}
-                    onPress={e => {
-                      e.stopPropagation?.();
-                      setExtendTarget(item);
-                    }}
-                  >
-                    <RotateCw size={13} color="#1d4ed8" />
-                    <Text style={styles.btnExtendText}>Gia hạn</Text>
-                  </TouchableOpacity>
+                    {/* Gia hạn */}
+                    <TouchableOpacity
+                      style={styles.btnExtendCompact}
+                      onPress={e => {
+                        e.stopPropagation?.();
+                        setExtendTarget(item);
+                      }}
+                    >
+                      <RotateCw size={13} color="#1d4ed8" />
+                      <Text style={styles.btnExtendCompactText}>Gia hạn</Text>
+                    </TouchableOpacity>
 
-                  {/* Xem chi tiết */}
-                  <TouchableOpacity
-                    style={styles.btnDetail}
-                    onPress={() => navigation.navigate('RentalDetail', { rental: item })}
-                  >
-                    <ChevronRight size={15} color={colors.gray[600]} />
-                  </TouchableOpacity>
+                    {/* Xem chi tiết */}
+                    <TouchableOpacity
+                      style={styles.btnDetailCompact}
+                      onPress={() => navigation.navigate('RentalDetail', { rental: item })}
+                    >
+                      <Text style={styles.btnDetailCompactText}>Chi tiết</Text>
+                      <ChevronRight size={13} color={colors.gray[600]} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
-              {/* ── Completed hint ── */}
+              {/* ── Completed hint + Harvest History link ── */}
               {item.status === 'COMPLETED' && (
                 <View style={styles.completedHint}>
                   <Text style={styles.completedHintText}>✅ Hợp đồng đã hoàn thành</Text>
+                  <TouchableOpacity
+                    style={styles.btnHistoryCompact}
+                    onPress={e => {
+                      e.stopPropagation?.();
+                      navigation.navigate('CustomerHarvestHistory', { rentalId: item.id, slotNumber: item.slotNumber } as any);
+                    }}
+                  >
+                    <History size={12} color={colors.green[700]} />
+                    <Text style={styles.btnHistoryCompactText}>Lịch sử thu hoạch</Text>
+                    <ChevronRight size={11} color={colors.green[600]} />
+                  </TouchableOpacity>
                 </View>
               )}
             </TouchableOpacity>
@@ -817,6 +846,17 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         rental={extendTarget}
         onClose={() => setExtendTarget(null)}
         onPaymentSettled={handlePaymentSettled}
+      />
+
+      {/* ─── Early Harvest Modal ──────────────────────────────────────── */}
+      <EarlyHarvestModal
+        visible={!!earlyHarvestTarget}
+        rental={earlyHarvestTarget}
+        onClose={() => setEarlyHarvestTarget(null)}
+        onSuccess={msg => {
+          load();
+          if (msg) Alert.alert('Thành công', msg);
+        }}
       />
 
       {/* Fullscreen Image Preview Modal */}
@@ -1178,6 +1218,105 @@ const styles = StyleSheet.create({
   btnCancelText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#dc2626' },
 
   // Active actions
+  actionSection: {
+    marginTop: spacing.sm,
+  },
+  actionRowMain: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  btnEarlyHarvestPrimary: {
+    flex: 1,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  btnEarlyHarvestPrimaryText: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: '#b45309',
+  },
+  btnPlantPrimary: {
+    flex: 1,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: colors.green[50],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.green[300],
+  },
+  btnPlantPrimaryText: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: colors.green[700],
+  },
+  actionRowSub: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  btnAddPillarsCompact: {
+    flex: 1.05,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.emerald[50],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.emerald[200],
+  },
+  btnAddPillarsCompactText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.emerald[700],
+  },
+  btnExtendCompact: {
+    flex: 1,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#eff6ff',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  btnExtendCompactText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#1d4ed8',
+  },
+  btnDetailCompact: {
+    flex: 0.95,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    backgroundColor: colors.gray[50],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+  },
+  btnDetailCompactText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.gray[700],
+  },
   btnPlant: {
     flex: 1,
     flexDirection: 'row',
@@ -1252,9 +1391,27 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.gray[100],
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   completedHintText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.gray[400] },
+  btnHistoryCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.green[50],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.green[200],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  btnHistoryCompactText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green[700],
+  },
   harvestBanner: {
     backgroundColor: '#fffbeb',
     borderRadius: radius.lg,
@@ -1397,6 +1554,65 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
     color: colors.white,
+  },
+  harvestWaitingCompact: {
+    backgroundColor: '#eff6ff',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  harvestWaitingCompactLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  harvestWaitingCompactTitle: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#1d4ed8',
+  },
+  harvestWaitingCompactRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  harvestWaitingCompactHint: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: '#2563eb',
+  },
+  btnEarlyHarvest: {
+    flex: 1.15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    borderWidth: 1,
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  btnEarlyHarvestActive: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+  },
+  btnEarlyHarvestDisabled: {
+    backgroundColor: colors.gray[50],
+    borderColor: colors.gray[200],
+    opacity: 0.65,
+  },
+  btnEarlyHarvestText: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: '#b45309',
   },
   harvestWaitingCard: {
     backgroundColor: '#eff6ff',

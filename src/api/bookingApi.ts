@@ -69,6 +69,6 @@ export const bookingApi = {
     apiClient.post<{ message: string }>(`/bookings/${rentalId}/confirm-payment`).then(r => r.data),
 
   // Khách hàng ghi nhận quyết định thu hoạch (Tự hái hoặc nhờ nhân viên)
-  recordHarvestDecision: (rentalId: number, decision: 'SELF' | 'STAFF', pillarCode?: string): Promise<void> =>
-    apiClient.post(`/bookings/${rentalId}/harvest-decision`, { decision, pillarCode }).then(() => undefined),
+  recordHarvestDecision: (rentalId: number, decision: 'SELF' | 'STAFF', pillarCode?: string, notes?: string): Promise<void> =>
+    apiClient.post(`/bookings/${rentalId}/harvest-decision`, { decision, pillarCode, notes }).then(() => undefined),
 };

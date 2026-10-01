@@ -40,6 +40,7 @@ import type { CustomerStackProps } from '../../navigation/types';
 import type { ServiceTypeDTO, BookingHistory } from '../../types/api';
 import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
 import { AddPillarsModal } from '../../components/customer/AddPillarsModal';
+import { EarlyHarvestModal } from '../../components/customer/EarlyHarvestModal';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const QUICK_MONTHS = [1, 3, 6, 12, 24];
@@ -101,6 +102,19 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   const [addPillarsVisible, setAddPillarsVisible] = useState(false);
   const [decidingHarvest, setDecidingHarvest] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [earlyHarvestVisible, setEarlyHarvestVisible] = useState(false);
+  const [earlyHarvestPillarCode, setEarlyHarvestPillarCode] = useState<string>('');
+
+  const reloadRental = async () => {
+    try {
+      const history = await bookingApi.getHistory();
+      const currentId = rental?.id || rentalId;
+      const found = history.find(r => r.id === currentId);
+      if (found) setRental(found);
+    } catch (err) {
+      console.error('Failed to reload rental:', err);
+    }
+  };
 
   const handleHarvestDecision = async (decision: 'SELF' | 'STAFF') => {
     if (!rental) return;
@@ -164,6 +178,9 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
     return used;
   }, [rental]);
   const availableArea = Math.max(0, Number((slotArea - currentUsedArea).toFixed(1)));
+  const hasPlantedTree = Boolean(
+    rental?.treeName || (rental?.pillars && rental.pillars.some((p: any) => p.treeName))
+  );
 
   const extLandPrice = rental?.landPrice ?? 0;
   const extPillarsPrice =
@@ -426,75 +443,139 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         )}
 
+        {/* ── Đang chờ nhân viên thu hoạch (Hiển thị chi tiết rõ ràng trong Detail) ── */}
         {isActive && rental.harvestDecision === 'STAFF' && (
-          <View style={styles.harvestWaitingCard}>
-            <Clock size={18} color="#2563eb" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.harvestWaitingTitle}>Đang chờ nhân viên thu hoạch</Text>
-              <Text style={styles.harvestWaitingDesc}>
-                Yêu cầu đã được gửi đến nhân viên làm vườn. Lịch sử thu hoạch sẽ được cập nhật sau khi hoàn tất nghiệm thu.
+          <View style={styles.harvestWaitingCardDetail}>
+            <View style={styles.harvestWaitingDetailHeader}>
+              <View style={styles.harvestWaitingIconWrap}>
+                <Clock size={20} color="#2563eb" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.harvestWaitingDetailTitle}>Đang chờ nhân viên thu hoạch</Text>
+                  <View style={styles.waitingBadge}>
+                    <Text style={styles.waitingBadgeText}>Đang xử lý</Text>
+                  </View>
+                </View>
+                <Text style={styles.harvestWaitingDetailSubtitle}>
+                  Vị trí: Trụ {rental.harvestPillarCode || (rental.pillarCodes && rental.pillarCodes.length > 0 ? rental.pillarCodes.join(', ') : 'Tất cả các trụ canh tác')}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.harvestWaitingDetailBody}>
+              <Text style={styles.harvestWaitingDetailDesc}>
+                Yêu cầu thu hoạch đã được gửi đến nhân viên làm vườn ca trực. Nhân viên sẽ tiến hành thu hoạch theo quy chuẩn, chụp ảnh nghiệm thu và bàn giao nông sản cho bạn.
               </Text>
+              <View style={styles.harvestWaitingDetailSteps}>
+                <View style={styles.stepItem}>
+                  <CheckCircle size={14} color="#16a34a" />
+                  <Text style={styles.stepText}>Đã tiếp nhận yêu cầu thu hoạch của bạn</Text>
+                </View>
+                <View style={styles.stepItem}>
+                  <Clock size={14} color="#2563eb" />
+                  <Text style={styles.stepText}>Nhân viên làm vườn đang chuẩn bị thu hoạch tại vườn</Text>
+                </View>
+                <View style={styles.stepItem}>
+                  <Sprout size={14} color={colors.gray[400]} />
+                  <Text style={[styles.stepText, { color: colors.gray[500] }]}>
+                    Nghiệm thu, chụp ảnh bằng chứng và cập nhật Lịch sử
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.btnGoToHistory}
+              onPress={() => navigation.navigate('CustomerHarvestHistory' as any, { rentalId: rental.id, slotNumber: rental.slotNumber })}
+            >
+              <Text style={styles.btnGoToHistoryText}>Xem Lịch sử thu hoạch</Text>
+              <ChevronRight size={14} color="#2563eb" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── Quick Actions Row (Đã xóa button Cảm biến theo ô vườn, cảm biến hiển thị tại từng trụ) ── */}
+        {isActive && (
+          <View style={[styles.card, { padding: spacing.sm, gap: spacing.xs }]}>
+            {/* Dòng 1: Thu hoạch sớm & Trồng mới (chia đôi đều nhau) */}
+            <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+              {rental.harvestDecision !== 'STAFF' && (
+                <TouchableOpacity
+                  style={[
+                    styles.btnQuickActionRow,
+                    hasPlantedTree ? styles.btnQuickEarlyActive : styles.btnQuickEarlyDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!hasPlantedTree) {
+                      Alert.alert(
+                        'Chưa thể thu hoạch sớm',
+                        'Trụ cây trong ô vườn đã được thu hoạch và chưa gieo giống mới. Vui lòng gieo trồng cây trước.'
+                      );
+                      return;
+                    }
+                    setEarlyHarvestPillarCode('');
+                    setEarlyHarvestVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Zap size={15} color={hasPlantedTree ? '#b45309' : colors.gray[400]} strokeWidth={2.2} />
+                  <Text style={[styles.btnQuickActionText, { color: hasPlantedTree ? '#b45309' : colors.gray[400] }]}>
+                    Thu hoạch sớm
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.btnQuickActionRow, styles.btnQuickPlant]}
+                onPress={() => navigation.navigate('CustomerTreePlanting', { rentalId: rental.id } as any)}
+                activeOpacity={0.8}
+              >
+                <Sprout size={15} color={colors.green[700]} />
+                <Text style={[styles.btnQuickActionText, { color: colors.green[700] }]}>
+                  Trồng mới
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Dòng 2: Thuê thêm & Sự cố (chia đôi đều nhau) */}
+            <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+              <TouchableOpacity
+                style={[
+                  styles.btnQuickActionRow,
+                  styles.btnQuickAddPillars,
+                  availableArea < 1.0 && styles.btnQuickDisabled,
+                ]}
+                onPress={() => {
+                  if (availableArea < 1.0) {
+                    Alert.alert('Thông báo', 'Ô vườn đã hết diện tích trống để đặt thêm trụ.');
+                    return;
+                  }
+                  setAddPillarsVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <PlusCircle size={15} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
+                <Text style={[styles.btnQuickActionText, availableArea < 1.0 && { color: colors.gray[400] }]}>
+                  Thuê thêm
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btnQuickActionRow, styles.btnQuickIncident]}
+                onPress={openIncident}
+                activeOpacity={0.8}
+              >
+                <TriangleAlert size={15} color="#dc2626" strokeWidth={2} />
+                <Text style={[styles.btnQuickActionText, { color: '#dc2626' }]}>
+                  Sự cố
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* ── Quick Actions Row ─────────────────────────── */}
-        {isActive && (
-          <View style={[styles.card, { flexDirection: 'row', gap: spacing.xs, padding: spacing.md }]}>
-            <TouchableOpacity
-              style={[styles.btnPlant, { flex: 1, margin: 0, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
-              onPress={() => {
-                const firstPillar = rental.pillars?.[0];
-                navigation.navigate('IoTDetail', {
-                  slotId: rental.slotId || rental.id,
-                  pillarId: firstPillar?.id,
-                  pillarCode: firstPillar?.pillarCode || rental.pillarCode,
-                });
-              }}
-            >
-              <Wifi size={14} color="#2563EB" />
-              <Text style={[styles.btnPlantText, { color: '#1D4ED8' }]}>Cảm biến</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.btnPlant, { flex: 1, margin: 0 }]}
-              onPress={() => navigation.navigate('CustomerTreePlanting', { rentalId: rental.id } as any)}
-            >
-              <Sprout size={14} color={colors.green[700]} />
-              <Text style={styles.btnPlantText}>Trồng mới</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.btnAddPillarQuick,
-                availableArea < 1.0 && styles.btnAddPillarQuickDisabled,
-                { flex: 1.1, margin: 0 },
-              ]}
-              onPress={() => {
-                if (availableArea < 1.0) {
-                  Alert.alert('Thông báo', 'Ô vườn đã hết diện tích trống để đặt thêm trụ.');
-                  return;
-                }
-                setAddPillarsVisible(true);
-              }}
-            >
-              <PlusCircle size={14} color={availableArea >= 1.0 ? colors.emerald[700] : colors.gray[400]} />
-              <Text style={[styles.btnAddPillarQuickText, availableArea < 1.0 && { color: colors.gray[400] }]}>
-                Thuê thêm
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.btnIncident, { flex: 0.9, margin: 0 }]}
-              onPress={openIncident}
-            >
-              <TriangleAlert size={14} color="#dc2626" strokeWidth={2} />
-              <Text style={styles.btnIncidentText}>Sự cố</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ── Pillar Info Card ──────────────────────────────────────────── */}
+        {/* ── Pillar Info Card (Cảm biến gắn theo trụ) ──────────────────────────────────────────── */}
         {rental.pillars && rental.pillars.length > 0 && (
           <View style={styles.card}>
             <View style={styles.pillarCardHeader}>
@@ -517,7 +598,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                     {treeName ? (
                       <Text style={styles.pillarTree}>🌱 {treeName}</Text>
                     ) : (
-                      <Text style={styles.pillarEmpty}>Chưa chọn giống cây</Text>
+                      <Text style={styles.pillarEmpty}>Chưa chọn giống cây (Đã thu hoạch)</Text>
                     )}
                     {harvestDate && (
                       <View style={styles.harvestDateRow}>
@@ -529,18 +610,23 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                     )}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {/* Nút thu hoạch sớm riêng cho trụ này nếu đang có cây */}
+                    {treeName && rental.harvestDecision !== 'STAFF' && (
+                      <TouchableOpacity
+                        style={styles.pillarEarlyHarvestBtnIcon}
+                        onPress={() => {
+                          setEarlyHarvestPillarCode(p.pillarCode);
+                          setEarlyHarvestVisible(true);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Zap size={14} color="#b45309" strokeWidth={2.2} />
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Nút cảm biến theo trụ - chỉ hiện icon */}
                     <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 5,
-                        borderRadius: 8,
-                        backgroundColor: '#EFF6FF',
-                        borderWidth: 1,
-                        borderColor: '#BFDBFE',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 3,
-                      }}
+                      style={styles.pillarSensorBtnIcon}
                       onPress={() => {
                         navigation.navigate('IoTDetail', {
                           slotId: rental.slotId || rental.id,
@@ -548,9 +634,9 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                           pillarCode: p.pillarCode,
                         });
                       }}
+                      activeOpacity={0.7}
                     >
-                      <Wifi size={12} color="#2563EB" />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>Cảm biến</Text>
+                      <Wifi size={15} color="#2563EB" />
                     </TouchableOpacity>
 
                     <View style={[
@@ -910,6 +996,18 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           </View>
         </Modal>
       )}
+
+      {/* Early Harvest Modal */}
+      <EarlyHarvestModal
+        visible={earlyHarvestVisible}
+        rental={rental}
+        initialPillarCode={earlyHarvestPillarCode}
+        onClose={() => setEarlyHarvestVisible(false)}
+        onSuccess={msg => {
+          reloadRental();
+          if (msg) Alert.alert('Thành công', msg);
+        }}
+      />
 
     </SafeAreaView>
   );
@@ -1467,6 +1565,179 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
+  },
+  btnPlantDisabled: {
+    opacity: 0.65,
+  },
+  // 2-line Quick Actions
+  btnQuickActionRow: {
+    flex: 1,
+    height: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  btnQuickEarlyActive: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  btnQuickEarlyDisabled: {
+    backgroundColor: colors.gray[50],
+    borderColor: colors.gray[200],
+    opacity: 0.65,
+  },
+  btnQuickPlant: {
+    backgroundColor: colors.green[50],
+    borderColor: colors.green[200],
+  },
+  btnQuickAddPillars: {
+    backgroundColor: colors.emerald[50],
+    borderColor: colors.emerald[200],
+  },
+  btnQuickIncident: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  btnQuickDisabled: {
+    backgroundColor: colors.gray[50],
+    borderColor: colors.gray[200],
+    opacity: 0.6,
+  },
+  btnQuickActionText: {
+    fontSize: 12.5,
+    fontFamily: 'Inter_700Bold',
+  },
+
+  // Pillar buttons icon-only
+  pillarEarlyHarvestBtnIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillarSensorBtnIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillarEarlyHarvestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  pillarEarlyHarvestBtnText: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: '#92400e',
+  },
+  harvestWaitingCardDetail: {
+    backgroundColor: '#eff6ff',
+    borderRadius: radius.xl,
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  harvestWaitingDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  harvestWaitingIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    backgroundColor: '#dbeafe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  harvestWaitingDetailTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: '#1e3a8a',
+  },
+  waitingBadge: {
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  waitingBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    color: '#1d4ed8',
+  },
+  harvestWaitingDetailSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#2563eb',
+    marginTop: 2,
+  },
+  harvestWaitingDetailBody: {
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: '#dbeafe',
+    gap: spacing.xs,
+  },
+  harvestWaitingDetailDesc: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: '#1d4ed8',
+    lineHeight: 18,
+  },
+  harvestWaitingDetailSteps: {
+    gap: 6,
+    marginTop: 4,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepText: {
+    fontSize: 11.5,
+    fontFamily: 'Inter_500Medium',
+    color: colors.gray[800],
+    flex: 1,
+  },
+  btnGoToHistory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#dbeafe',
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    marginTop: 4,
+  },
+  btnGoToHistoryText: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: '#1d4ed8',
   },
   harvestWaitingCard: {
     backgroundColor: '#eff6ff',

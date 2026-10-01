@@ -230,6 +230,10 @@ export interface HarvestHistoryItem {
   staffName?: string;
   plantedAt?: string;
   harvestedAt: string;
+  harvestDays?: number;
+  daysGrown?: number;
+  evidenceImageUrl?: string;
+  staffNotes?: string;
 }
 
 export interface ServiceRequestDTO {

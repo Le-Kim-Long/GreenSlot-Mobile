@@ -428,7 +428,13 @@ export function getNotificationActionRoute(notification: NotificationResponseDTO
     return { screen: 'Rentals' };
   }
   if (t.startsWith('HARVEST_') || (t.includes('HARVEST') && (t.includes('COMPLETED') || t.includes('DONE')))) {
-    return { screen: 'CustomerHarvestHistory' };
+    return {
+      screen: 'CustomerHarvestHistory',
+      params: {
+        rentalId: rentalId || notification.referenceId,
+        slotNumber,
+      },
+    };
   }
 
   // 6. Gardening Tasks
