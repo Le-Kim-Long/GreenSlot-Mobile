@@ -27,7 +27,7 @@ import type { SensorReadingResponseDTO } from '../../types/api';
 import type { CustomerStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
-import { spacing } from '../../theme/typography';
+import { spacing, radius } from '../../theme/typography';
 
 const { width } = Dimensions.get('window');
 const POLL_INTERVAL = 10000;
@@ -274,6 +274,32 @@ function SensorGaugeCard({
   );
 }
 
+// Hàm kiểm tra an toàn xem thiết bị có đang kết nối và có dữ liệu đo đạc mới (trong 5 phút) hay không
+const checkIsActive = (latestReadings: any[], historyReadings: any[] = []) => {
+  const now = Date.now();
+  let maxTime = 0;
+  const allRecords = [...(latestReadings || []), ...(historyReadings || [])];
+  for (const r of allRecords) {
+    if (!r) continue;
+    const timeVal = (r as any).recordedAt || (r as any).createdAt || (r as any).timestamp || (r as any).time;
+    if (timeVal) {
+      const t = new Date(timeVal).getTime();
+      if (!isNaN(t) && t > maxTime) {
+        maxTime = t;
+      }
+    }
+  }
+  if (maxTime === 0) return { isActive: false, lastTime: '' };
+  const isActive = Math.abs(now - maxTime) <= 5 * 60 * 1000;
+  const lastTime = new Date(maxTime).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+  });
+  return { isActive, lastTime };
+};
+
 // ─────────────────────────────────────────────────────
 // MAIN DETAIL SCREEN
 // ─────────────────────────────────────────────────────
@@ -286,6 +312,8 @@ export default function IoTDetailScreen() {
   const resolvedPillarCodeRef = useRef<string | null>(null);
   const [readings, setReadings] = useState<SensorReadingResponseDTO[]>([]);
   const [historyData, setHistoryData] = useState<Record<string, number[]>>({});
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastRecordedTime, setLastRecordedTime] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -309,6 +337,10 @@ export default function IoTDetailScreen() {
 
       const latestData = latest.status === 'fulfilled' ? (latest.value || []) : [];
       const histData = hist.status === 'fulfilled' ? (hist.value || []) : [];
+
+      const { isActive, lastTime } = checkIsActive(latestData, histData);
+      setIsOnline(isActive);
+      setLastRecordedTime(lastTime);
 
       // Sort and group history
       const trendMap: Record<string, number[]> = {};
@@ -435,6 +467,15 @@ export default function IoTDetailScreen() {
                 <Text style={styles.detailInfoLabel}>Số hốc:</Text>
                 <Text style={styles.detailInfoValue}>{rental?.capacityHoles} hốc</Text>
               </View>
+              <View style={styles.detailInfoRow}>
+                <Text style={styles.detailInfoLabel}>Trạng thái:</Text>
+                <View style={[styles.statusBadge, isOnline ? styles.statusBadgeOnline : styles.statusBadgeOffline]}>
+                  <View style={[styles.statusDot, isOnline ? styles.statusDotOnline : styles.statusDotOffline]} />
+                  <Text style={[styles.statusBadgeText, isOnline ? styles.statusBadgeTextOnline : styles.statusBadgeTextOffline]}>
+                    {isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
+                  </Text>
+                </View>
+              </View>
               {rental?.locationName && (
                 <View style={[styles.detailInfoRow, { marginTop: 4 }]}>
                   <MapPin size={11} color='rgba(255,255,255,0.7)' />
@@ -449,8 +490,24 @@ export default function IoTDetailScreen() {
       {/* Section Title */}
       <Text style={styles.sectionHeaderTitle}>Chỉ số thiết bị đo thực tế</Text>
 
-      {/* Sensor gauge cards */}
-      {readings.length === 0 ? (
+      {/* Sensor gauge cards or offline alert */}
+      {!isOnline ? (
+        <Card style={styles.offlineCard}>
+          <View style={styles.offlineHeader}>
+            <View style={styles.offlineDot} />
+            <Text style={styles.offlineTitle}>Thiết bị ngoại tuyến</Text>
+          </View>
+          <Text style={styles.offlineDesc}>
+            Trụ hiện chưa kết nối hoặc chưa có tín hiệu cảm biến trong 5 phút qua. Các thẻ chỉ số tức thời đang tạm ẩn số liệu.
+          </Text>
+          {lastRecordedTime ? (
+            <View style={styles.offlineLastTimeRow}>
+              <Text style={styles.offlineLastTimeLabel}>Lần đo gần nhất:</Text>
+              <Text style={styles.offlineLastTimeValue}>{lastRecordedTime}</Text>
+            </View>
+          ) : null}
+        </Card>
+      ) : readings.length === 0 ? (
         <Card style={styles.noDataCard}>
           <Text style={styles.noDataText}>⚠️ Chưa nhận được tín hiệu cảm biến từ trụ này.</Text>
         </Card>
@@ -560,6 +617,91 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
     color: 'rgba(255,255,255,0.85)',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  statusBadgeOnline: {
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  statusBadgeOffline: {
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusDotOnline: {
+    backgroundColor: '#86EFAC',
+  },
+  statusDotOffline: {
+    backgroundColor: '#CBD5E1',
+  },
+  statusBadgeText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+  },
+  statusBadgeTextOnline: {
+    color: '#F0FDF4',
+  },
+  statusBadgeTextOffline: {
+    color: '#E2E8F0',
+  },
+  offlineCard: {
+    padding: spacing.lg,
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    marginBottom: spacing.md,
+  },
+  offlineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  offlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F59E0B',
+  },
+  offlineTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: '#92400E',
+  },
+  offlineDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12.5,
+    color: '#B45309',
+    lineHeight: 18,
+  },
+  offlineLastTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#FEF3C7',
+  },
+  offlineLastTimeLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#92400E',
+  },
+  offlineLastTimeValue: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: '#78350F',
   },
   sectionHeaderTitle: {
     fontFamily: 'Inter_700Bold',

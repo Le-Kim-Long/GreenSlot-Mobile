@@ -417,6 +417,7 @@ export interface TreeDTO {
   phMax?: number;
   compensationPercentage?: number;
   careInstructions?: string;
+  quantity?: number;
   isActive?: boolean;
 }
 

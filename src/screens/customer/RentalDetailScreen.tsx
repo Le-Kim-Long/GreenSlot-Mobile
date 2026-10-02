@@ -40,6 +40,7 @@ import type { CustomerStackProps } from '../../navigation/types';
 import type { ServiceTypeDTO, BookingHistory } from '../../types/api';
 import { getMobileRedirectUrl, openAndWaitForPayment } from '../../utils/paymentFlow';
 import { AddPillarsModal } from '../../components/customer/AddPillarsModal';
+import { EarlyHarvestModal } from '../../components/customer/EarlyHarvestModal';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const QUICK_MONTHS = [1, 3, 6, 12, 24];
@@ -99,6 +100,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
   const [monthsError, setMonthsError] = useState('');
   const [extending, setExtending] = useState(false);
   const [addPillarsVisible, setAddPillarsVisible] = useState(false);
+  const [earlyHarvestVisible, setEarlyHarvestVisible] = useState(false);
   const [decidingHarvest, setDecidingHarvest] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -491,6 +493,19 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
               <TriangleAlert size={14} color="#dc2626" strokeWidth={2} />
               <Text style={styles.btnIncidentText}>Sự cố</Text>
             </TouchableOpacity>
+
+            {Boolean(rental.treeName || (rental.pillars && rental.pillars.some((p: any) => p.treeName))) && rental.harvestDecision !== 'STAFF' && (
+              <TouchableOpacity
+                style={[
+                  styles.btnPlant,
+                  { flex: 1.1, margin: 0, backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+                ]}
+                onPress={() => setEarlyHarvestVisible(true)}
+              >
+                <Zap size={14} color="#D97706" />
+                <Text style={[styles.btnPlantText, { color: '#B45309' }]}>Thu hoạch</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -828,6 +843,22 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             txnRef: callback?.txnRef,
             orderInfo: callback?.orderInfo,
           });
+        }}
+      />
+
+      {/* Early Harvest Modal */}
+      <EarlyHarvestModal
+        visible={earlyHarvestVisible}
+        rental={rental}
+        onClose={() => setEarlyHarvestVisible(false)}
+        onSuccess={(method) => {
+          setRental(prev => prev ? { ...prev, harvestDecision: method } : null);
+          Alert.alert(
+            'Thành công',
+            method === 'SELF'
+              ? 'Hệ thống đã ghi nhận bạn tự thu hoạch. Trụ canh tác đã được giải phóng để sẵn sàng gieo giống mới!'
+              : 'Đã gửi yêu cầu thu hoạch sớm cho nhân viên làm vườn! Nhân viên sẽ tiến hành thu hoạch, chụp ảnh nghiệm thu và bàn giao cho bạn.'
+          );
         }}
       />
 

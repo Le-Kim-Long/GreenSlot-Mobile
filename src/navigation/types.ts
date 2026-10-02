@@ -30,6 +30,7 @@ export type CustomerStackParamList = {
   CustomerTreePlanting: undefined;
   CustomerHarvestHistory: undefined;
   HarvestHistory?: undefined;
+  CareServices: undefined;
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
     type?: 'rental' | 'tree' | 'add_pillar' | 'extend';

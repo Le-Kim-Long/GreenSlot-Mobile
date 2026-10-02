@@ -34,6 +34,7 @@ import {
   Layers,
   PlusCircle,
   Wifi,
+  Zap,
 } from 'lucide-react-native';
 import { bookingApi } from '../../api/bookingApi';
 import { taskApi, managerApi } from '../../api/taskApi';
@@ -49,6 +50,7 @@ import type { CustomerTabProps } from '../../navigation/types';
 import { openAndWaitForPayment } from '../../utils/paymentFlow';
 import { AddPillarsModal } from '../../components/customer/AddPillarsModal';
 import { ExtendRentalModal } from '../../components/customer/ExtendRentalModal';
+import { EarlyHarvestModal } from '../../components/customer/EarlyHarvestModal';
 
 type TabKey = 'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'COMPLETED';
 
@@ -265,8 +267,19 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
   const [incidentTarget, setIncidentTarget] = useState<BookingHistory | null>(null);
   const [addPillarsTarget, setAddPillarsTarget] = useState<BookingHistory | null>(null);
   const [extendTarget, setExtendTarget] = useState<BookingHistory | null>(null);
+  const [earlyHarvestTarget, setEarlyHarvestTarget] = useState<BookingHistory | null>(null);
   const [decidingId, setDecidingId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const handleEarlyHarvestSuccess = (method: 'SELF' | 'STAFF') => {
+    load();
+    Alert.alert(
+      'Thành công',
+      method === 'SELF'
+        ? 'Hệ thống đã ghi nhận bạn tự thu hoạch. Trụ canh tác đã được giải phóng để sẵn sàng gieo giống mới!'
+        : 'Đã gửi yêu cầu thu hoạch sớm cho nhân viên làm vườn! Nhân viên sẽ tiến hành thu hoạch, chụp ảnh nghiệm thu và bàn giao cho bạn.'
+    );
+  };
 
   const handleHarvestDecision = async (rentalId: number, decision: 'SELF' | 'STAFF', pillarCode?: string) => {
     setDecidingId(rentalId);
@@ -771,6 +784,20 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                     <Text style={styles.btnExtendText}>Gia hạn</Text>
                   </TouchableOpacity>
 
+                  {/* Yêu cầu thu hoạch sớm */}
+                  {item.harvestDecision !== 'STAFF' && (
+                    <TouchableOpacity
+                      style={styles.btnEarlyHarvest}
+                      onPress={e => {
+                        e.stopPropagation?.();
+                        setEarlyHarvestTarget(item);
+                      }}
+                    >
+                      <Zap size={13} color="#D97706" />
+                      <Text style={styles.btnEarlyHarvestText}>Thu hoạch</Text>
+                    </TouchableOpacity>
+                  )}
+
                   {/* Xem chi tiết */}
                   <TouchableOpacity
                     style={styles.btnDetail}
@@ -792,7 +819,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         }}
       />
 
-      {/* ─── Incident Report Modal ──────────────────────────────────────── */}
+      {/* ─── Incident Report Modal ─────────────────────────────────────── */}
       <IncidentReportModal
         visible={!!incidentTarget}
         rental={incidentTarget}
@@ -817,6 +844,14 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
         rental={extendTarget}
         onClose={() => setExtendTarget(null)}
         onPaymentSettled={handlePaymentSettled}
+      />
+
+      {/* ─── Early Harvest Modal ──────────────────────────────────────── */}
+      <EarlyHarvestModal
+        visible={!!earlyHarvestTarget}
+        rental={earlyHarvestTarget}
+        onClose={() => setEarlyHarvestTarget(null)}
+        onSuccess={handleEarlyHarvestSuccess}
       />
 
       {/* Fullscreen Image Preview Modal */}
@@ -1147,6 +1182,7 @@ const styles = StyleSheet.create({
   // Action row (shared container)
   actionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.xs,
     marginTop: spacing.md,
@@ -1222,6 +1258,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   btnExtendText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#1d4ed8' },
+  btnEarlyHarvest: {
+    flex: 1.1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    backgroundColor: '#fffbeb',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  btnEarlyHarvestText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#b45309' },
   btnIncident: {
     flex: 0.9,
     flexDirection: 'row',
