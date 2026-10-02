@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 const TOKEN_KEY = 'greenslot_token';
 
 export function resolveApiBaseUrl(): string {
-  const raw = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
+  const raw = process.env.EXPO_PUBLIC_API_URL || 'https://greenslot-backend.onrender.com/api';
   const trimmed = raw.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 }
