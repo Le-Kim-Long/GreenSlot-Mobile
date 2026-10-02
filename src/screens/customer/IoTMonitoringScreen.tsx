@@ -45,9 +45,11 @@ interface RentedSlotOption {
 // ─────────────────────────────────────────────────────
 function PillarSummaryCard({
   rental,
+  isOnline,
   onViewDetail,
 }: {
   rental: RentedSlotOption;
+  isOnline: boolean;
   onViewDetail: () => void;
 }) {
   return (
@@ -60,8 +62,13 @@ function PillarSummaryCard({
       <View style={styles.summaryCardHeader}>
         <View style={styles.summaryCardLeft}>
           <View style={styles.pillarTitleRow}>
-            <View style={styles.onlineDot} />
+            <View style={[styles.onlineDot, !isOnline && styles.offlineDot]} />
             <Text style={styles.pillarCodeText}>Trụ {rental.pillarCode || 'ESP32'}</Text>
+            <View style={[styles.statusPill, isOnline ? styles.statusPillOnline : styles.statusPillOffline]}>
+              <Text style={[styles.statusPillText, isOnline ? styles.statusPillTextOnline : styles.statusPillTextOffline]}>
+                {isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
+              </Text>
+            </View>
           </View>
         </View>
         <TouchableOpacity
@@ -122,7 +129,40 @@ export default function IoTMonitoringScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState('');
+  const [pillarOnlineMap, setPillarOnlineMap] = useState<Record<string, boolean>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const checkPillarsOnline = useCallback(async (optionsList: RentedSlotOption[]) => {
+    const uniqueCodes = Array.from(
+      new Set(
+        optionsList
+          .map(o => o.pillarCode)
+          .filter((c): c is string => Boolean(c && c !== 'arduino-greenhouse-01'))
+      )
+    );
+    if (uniqueCodes.length === 0) return;
+    const map: Record<string, boolean> = {};
+    const now = Date.now();
+    await Promise.all(
+      uniqueCodes.map(async code => {
+        try {
+          const latest = await iotApi.getLatest(code);
+          let maxTime = 0;
+          (latest || []).forEach((r: any) => {
+            const timeVal = r.recordedAt || r.createdAt || r.timestamp || r.time;
+            if (timeVal) {
+              const t = new Date(timeVal).getTime();
+              if (!isNaN(t) && t > maxTime) maxTime = t;
+            }
+          });
+          map[code] = maxTime > 0 && Math.abs(now - maxTime) <= 5 * 60 * 1000;
+        } catch {
+          map[code] = false;
+        }
+      })
+    );
+    setPillarOnlineMap(prev => ({ ...prev, ...map }));
+  }, []);
 
   // Load active rentals / monitored pillars (expand pillars list)
   const loadRentals = useCallback(async () => {
@@ -214,15 +254,19 @@ export default function IoTMonitoringScreen() {
       }
 
       setRentals(options);
+      checkPillarsOnline(options);
     } catch {
       setRentals([]);
     }
-  }, []);
+  }, [checkPillarsOnline]);
 
   // Poll update timestamp simulation
   const checkStatus = useCallback(() => {
     setLastUpdate(new Date().toLocaleTimeString('vi-VN'));
-  }, []);
+    if (rentals.length > 0) {
+      checkPillarsOnline(rentals);
+    }
+  }, [rentals, checkPillarsOnline]);
 
   useEffect(() => {
     loadRentals().finally(() => setLoading(false));
@@ -393,6 +437,7 @@ export default function IoTMonitoringScreen() {
             <PillarSummaryCard
               key={`${r.slotId}-${r.pillarCode}-${idx}`}
               rental={r}
+              isOnline={pillarOnlineMap[r.pillarCode || ''] ?? false}
               onViewDetail={() => navigation.navigate('IoTDetail', {
                 slotId: r.slotId,
                 pillarId: r.pillarId,
@@ -573,6 +618,31 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#22C55E',
+  },
+  offlineDot: {
+    backgroundColor: '#94A3B8',
+  },
+  statusPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 999,
+    marginLeft: 4,
+  },
+  statusPillOnline: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusPillOffline: {
+    backgroundColor: '#F1F5F9',
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  statusPillTextOnline: {
+    color: '#15803D',
+  },
+  statusPillTextOffline: {
+    color: '#64748B',
   },
   pillarCodeText: {
     fontFamily: 'Inter_700Bold',

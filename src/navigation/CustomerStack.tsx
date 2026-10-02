@@ -13,6 +13,7 @@ import CustomerTreePlantingScreen from '../screens/customer/CustomerTreePlanting
 import CustomerHarvestHistoryScreen from '../screens/customer/CustomerHarvestHistoryScreen';
 import PaymentResultScreen from '../screens/customer/PaymentResultScreen';
 import HarvestHistoryScreen from '../screens/customer/HarvestHistoryScreen';
+import CareServicesScreen from '../screens/customer/CareServicesScreen';
 import type { CustomerStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<CustomerStackParamList>();
@@ -40,6 +41,7 @@ export function CustomerStack() {
       <Stack.Screen name="CustomerHarvestHistory" component={CustomerHarvestHistoryScreen} options={{ title: 'Lịch sử thu hoạch' }} />
       <Stack.Screen name="PaymentResult" component={PaymentResultScreen} options={{ headerShown: false }} />
       <Stack.Screen name="HarvestHistory" component={HarvestHistoryScreen} options={{ title: 'Lịch sử thu hoạch' }} />
+      <Stack.Screen name="CareServices" component={CareServicesScreen} options={{ title: 'Dịch vụ chăm sóc' }} />
     </Stack.Navigator>
   );
 }

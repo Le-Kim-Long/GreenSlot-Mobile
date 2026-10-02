@@ -38,6 +38,7 @@ export type CustomerStackParamList = {
     harvestId?: number;
     slotNumber?: string;
   };
+  CareServices: undefined;
   PaymentResult: {
     status: 'success' | 'failed' | 'pending';
     type?: 'rental' | 'tree' | 'add_pillar' | 'extend';

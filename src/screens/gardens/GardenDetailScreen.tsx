@@ -257,8 +257,9 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
     treeApi.getActiveTrees()
       .then(data => {
         setTrees(data);
-        if (data.length > 0 && data[0].id != null) {
-          setSelectedTreeId(data[0].id);
+        const inStock = data.find(t => t.quantity == null || t.quantity > 0) || data[0];
+        if (inStock && inStock.id != null) {
+          setSelectedTreeId(inStock.id);
         }
       })
       .catch(() => setTrees([]));
@@ -394,6 +395,11 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
   };
 
   const handleSelectTree = (treeId: number) => {
+    const targetTree = trees.find(t => t.id === treeId);
+    if (targetTree && targetTree.quantity != null && targetTree.quantity <= 0) {
+      Alert.alert('Hết hàng', `Giống cây "${targetTree.treeName}" hiện đã hết hàng trong kho. Vui lòng chọn giống khác.`);
+      return;
+    }
     if (seedMode === 'ALL') {
       setSelectedTreeId(treeId);
       setPillarTreeSelections(prev => {
@@ -642,13 +648,24 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
 
                 const isExceeded = (t.minRentalDays || 0) / 30 > selectedMonths;
 
+                const isOutOfStock = t.quantity != null && t.quantity <= 0;
+
                 return (
                   <TouchableOpacity
                     key={tId}
-                    style={[styles.treeCard, isSelected && styles.treeCardSelected]}
+                    style={[
+                      styles.treeCard,
+                      isSelected && styles.treeCardSelected,
+                      isOutOfStock && { opacity: 0.5, backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' }
+                    ]}
                     onPress={() => handleSelectTree(tId)}
-                    activeOpacity={0.9}
+                    activeOpacity={isOutOfStock ? 1 : 0.9}
                   >
+                    {isOutOfStock && (
+                      <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#dc2626' }}>❌ Tạm hết hàng trong kho</Text>
+                      </View>
+                    )}
                     <View style={styles.treeCardHeader}>
                       <View style={[styles.treeIconBox, isSelected && styles.treeIconBoxSelected]}>
                         <Sprout size={18} color={isSelected ? colors.white : colors.green[700]} />
