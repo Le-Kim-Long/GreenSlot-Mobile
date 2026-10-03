@@ -106,8 +106,17 @@ function PillarSummaryCard({
       </View>
 
       <View style={styles.onlineRow}>
-        <CheckCircle2 size={12} color='#16A34A' />
-        <Text style={styles.onlineText}>Online</Text>
+        {isOnline ? (
+          <>
+            <CheckCircle2 size={12} color='#16A34A' />
+            <Text style={styles.onlineText}>Trực tuyến</Text>
+          </>
+        ) : (
+          <>
+            <View style={styles.offlineDotSmall} />
+            <Text style={styles.offlineText}>Ngoại tuyến (Xem biểu đồ đo)</Text>
+          </>
+        )}
         <ChevronRight size={14} color='#94A3B8' style={{ marginLeft: 'auto' }} />
       </View>
     </TouchableOpacity>
@@ -728,5 +737,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
     color: '#16A34A',
+  },
+  offlineDotSmall: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#94A3B8',
+  },
+  offlineText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    color: '#64748B',
   },
 });

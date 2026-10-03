@@ -9,6 +9,17 @@ import {
   Dimensions,
   ViewStyle,
 } from 'react-native';
+import Svg, {
+  Path,
+  Line,
+  Circle,
+  Rect,
+  Text as SvgText,
+  Defs,
+  LinearGradient,
+  Stop,
+  G,
+} from 'react-native-svg';
 import {
   Thermometer,
   Droplets,
@@ -18,6 +29,8 @@ import {
   Sprout,
   TrendingUp,
   ArrowLeft,
+  Clock,
+  WifiOff,
 } from 'lucide-react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,7 +44,15 @@ import { spacing, radius } from '../../theme/typography';
 
 const { width } = Dimensions.get('window');
 const POLL_INTERVAL = 10000;
-const HISTORY_LIMIT = 20;
+const HISTORY_LIMIT = 50;
+
+export interface HistoryPoint {
+  value: number;
+  recordedAt: string;
+  timeStr: string;
+  dateStr: string;
+  fullDateTimeStr: string;
+}
 
 const SENSOR_ICONS: Record<string, typeof Thermometer> = {
   TEMPERATURE: Thermometer,
@@ -47,19 +68,19 @@ const SENSOR_NAMES_VI: Record<string, string> = {
   TEMPERATURE: 'Nhiệt độ không khí',
   HUMIDITY: 'Độ ẩm không khí',
   SOIL_MOISTURE: 'Độ ẩm đất',
-  LIGHT: 'Ánh sáng',
-  LIGHT_INTENSITY: 'Ánh sáng',
+  LIGHT: 'Cường độ ánh sáng',
+  LIGHT_INTENSITY: 'Cường độ ánh sáng',
   CO2: 'Nồng độ CO2',
-  PH: 'Độ pH',
+  PH: 'Độ pH đất',
 };
 
 const SENSOR_COLORS: Record<string, string> = {
-  SOIL_MOISTURE: '#3B82F6',
-  PH: '#8B5CF6',
-  TEMPERATURE: '#EF4444',
-  HUMIDITY: '#10B981',
-  LIGHT: '#F59E0B',
-  LIGHT_INTENSITY: '#F59E0B',
+  SOIL_MOISTURE: '#16A34A',
+  PH: '#2563EB',
+  LIGHT_INTENSITY: '#DC2626',
+  LIGHT: '#DC2626',
+  TEMPERATURE: '#F97316',
+  HUMIDITY: '#06B6D4',
   CO2: '#6B7280',
 };
 
@@ -87,121 +108,318 @@ const getSensorStatus = (type: string, val: number) => {
   return { status: 'safe', color: '#16A34A', text: 'Bình thường' };
 };
 
+const computeYTicks = (sensorType: string, values: number[]) => {
+  const t = sensorType.toUpperCase();
+  const rawMax = values.length > 0 ? Math.max(...values) : 0;
+  const rawMin = values.length > 0 ? Math.min(...values) : 0;
+
+  if (t.includes('SOIL_MOISTURE') || t.includes('HUMIDITY')) {
+    const max = rawMax > 80 ? 100 : 80;
+    const step = max / 4;
+    return [max, max - step, max - step * 2, max - step * 3, 0];
+  }
+  if (t.includes('PH')) {
+    const max = rawMax > 12 ? 14 : 12;
+    const step = max / 4;
+    return [max, max - step, max - step * 2, max - step * 3, 0].map(v => Number(v.toFixed(1)));
+  }
+  if (t.includes('LIGHT')) {
+    const max = Math.max(1800, Math.ceil((rawMax || 1800) / 450) * 450);
+    const step = max / 4;
+    return [max, max - step, max - step * 2, max - step * 3, 0].map(Math.round);
+  }
+  if (t.includes('TEMPERATURE')) {
+    const max = Math.max(40, Math.ceil(rawMax / 10) * 10);
+    const min = Math.min(0, Math.floor(rawMin / 10) * 10);
+    const step = (max - min) / 4;
+    return [max, max - step, max - step * 2, max - step * 3, min].map(Math.round);
+  }
+
+  // Generic fallback: 5 clean levels
+  let min = Math.floor(rawMin);
+  let max = Math.ceil(rawMax);
+  if (min === max) {
+    min = Math.max(0, min - 2);
+    max = max + 2;
+  }
+  const step = (max - min) / 4;
+  return [max, max - step, max - step * 2, max - step * 3, min].map(v => Number(v.toFixed(1)));
+};
+
 // ─────────────────────────────────────────────────────
-// SVG GRADIENT LINE CHART (Smooth and Continuous)
+// SVG INTERACTIVE LINE CHART (Displays Timestamps & Values)
 // ─────────────────────────────────────────────────────
 function SvgLineChart({
   data,
   color,
-  height = 90,
-  chartWidth,
+  unit,
+  sensorType,
+  cardWidth,
 }: {
-  data: number[];
+  data: HistoryPoint[];
   color: string;
-  height?: number;
-  chartWidth: number;
+  unit: string;
+  sensorType: string;
+  cardWidth: number;
 }) {
-  if (data.length < 2) return null;
+  const [selectedIndex, setSelectedIndex] = useState<number>(data.length - 1);
+  const scrollRef = useRef<ScrollView>(null);
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
+  useEffect(() => {
+    setSelectedIndex(data.length - 1);
+    if (scrollRef.current && data.length > 4) {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [data.length]);
 
-  // Layout boundaries
-  const padH = 12;
-  const padTop = 15;
-  const padBottom = 15;
-  const usableW = chartWidth - padH * 2;
-  const usableH = height - padTop - padBottom;
+  if (data.length === 0) {
+    return (
+      <View style={styles.chartEmptyBox}>
+        <Text style={styles.noDataText}>Chưa có dữ liệu đo đạc nào</Text>
+      </View>
+    );
+  }
 
-  // Compute coordinate points
-  const points = data.map((v, i) => {
-    const x = padH + (i / (data.length - 1)) * usableW;
-    const y = padTop + (1 - (v - min) / range) * usableH;
-    return { x, y, value: v };
+  const CHART_HEIGHT = 175;
+  const PAD_TOP = 26;
+  const PAD_BOTTOM = 34;
+  const Y_AXIS_WIDTH = 42;
+  const USABLE_H = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const availableChartW = Math.max(200, cardWidth - Y_AXIS_WIDTH - 24);
+
+  const values = data.map(d => d.value);
+  const yTicks = computeYTicks(sensorType, values);
+  const maxVal = yTicks[0];
+  const minVal = yTicks[yTicks.length - 1];
+  const valRange = maxVal - minVal || 1;
+
+  // Horizontal spacing per point
+  const POINT_SPACING = Math.max(56, (availableChartW - 40) / Math.max(1, data.length - 1));
+  const totalSvgWidth = Math.max(availableChartW, 40 + (data.length - 1) * POINT_SPACING);
+
+  const points = data.map((d, i) => {
+    const x = 20 + i * POINT_SPACING;
+    const clampedVal = Math.min(Math.max(d.value, minVal), maxVal);
+    const y = PAD_TOP + (1 - (clampedVal - minVal) / valRange) * USABLE_H;
+    return { ...d, x, y, isSelected: i === selectedIndex };
   });
 
-  // Calculate segments connecting the dots
-  const segments = points.slice(0, -1).map((p, i) => {
-    const next = points[i + 1];
-    const dx = next.x - p.x;
-    const dy = next.y - p.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    return { x: p.x, y: p.y, len, angle, yMax: Math.max(p.y, next.y) };
-  });
+  const activePoint = points[selectedIndex] || points[points.length - 1];
+
+  // SVG Line & Area path strings
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const baselineY = PAD_TOP + USABLE_H;
+  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${baselineY.toFixed(1)} L ${points[0].x.toFixed(1)} ${baselineY.toFixed(1)} Z`;
+
+  // Tooltip geometry
+  const tooltipW = 96;
+  const tooltipH = 38;
+  const tooltipX = Math.max(4, Math.min(totalSvgWidth - tooltipW - 4, activePoint.x - tooltipW / 2));
+  const tooltipY = activePoint.y - tooltipH - 8 < 4 ? activePoint.y + 10 : activePoint.y - tooltipH - 8;
+
+  const gradientId = `grad-${sensorType.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
 
   return (
-    <View style={{ height, width: chartWidth, marginTop: 8, position: 'relative', overflow: 'hidden' }}>
-      {/* Horizontal guide lines */}
-      <View style={{ position: 'absolute', left: padH, right: padH, top: padTop, height: 1, backgroundColor: '#F1F5F9' }} />
-      <View style={{ position: 'absolute', left: padH, right: padH, top: padTop + usableH / 2, height: 1, backgroundColor: '#F1F5F9' }} />
-      <View style={{ position: 'absolute', left: padH, right: padH, top: padTop + usableH, height: 1.5, backgroundColor: '#E2E8F0' }} />
+    <View style={styles.chartWrapper}>
+      {/* Chart Canvas Area */}
+      <View style={styles.chartRow}>
+        {/* Fixed Y-Axis column on left */}
+        <View style={[styles.yAxisContainer, { height: CHART_HEIGHT, width: Y_AXIS_WIDTH }]}>
+          {yTicks.map((tv, idx) => {
+            const tickY = PAD_TOP + (1 - (tv - minVal) / valRange) * USABLE_H;
+            return (
+              <Text
+                key={`ytick-${idx}`}
+                style={[
+                  styles.yAxisLabel,
+                  { position: 'absolute', top: tickY - 7, right: 6 },
+                ]}
+                numberOfLines={1}
+              >
+                {tv}
+              </Text>
+            );
+          })}
+          {/* Vertical axis line */}
+          <View style={[styles.yAxisBorder, { top: PAD_TOP, height: USABLE_H }]} />
+        </View>
 
-      {/* Area Gradient fill effect (rendered as thin colored columns under each segment zone to look like continuous area) */}
-      {points.map((p, i) => {
-        if (i === points.length - 1) return null;
-        const next = points[i + 1];
-        const segWidth = next.x - p.x;
-        const midY = (p.y + next.y) / 2;
-        const colHeight = height - midY;
-        
-        return (
-          <View
-            key={`fill-${i}`}
-            style={{
-              position: 'absolute',
-              left: p.x,
-              top: midY,
-              width: segWidth,
-              height: colHeight,
-              backgroundColor: color,
-              opacity: 0.1,
-            }}
-          />
-        );
-      })}
+        {/* Scrollable Chart Body */}
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ width: totalSvgWidth }}
+          style={styles.chartScrollView}
+        >
+          <Svg width={totalSvgWidth} height={CHART_HEIGHT}>
+            <Defs>
+              <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0%" stopColor={color} stopOpacity="0.28" />
+                <Stop offset="100%" stopColor={color} stopOpacity="0.01" />
+              </LinearGradient>
+            </Defs>
 
-      {/* Clean continuous connecting lines */}
-      {segments.map((seg, i) => (
-        <View
-          key={`line-${i}`}
-          style={{
-            position: 'absolute',
-            left: seg.x,
-            top: seg.y,
-            width: seg.len,
-            height: 2.5,
-            backgroundColor: color,
-            transform: [
-              { translateX: 0 },
-              { translateY: 0 },
-              { rotate: `${seg.angle}deg` }
-            ],
-            transformOrigin: 'left center',
-            borderRadius: 1,
-          }}
-        />
-      ))}
+            {/* Horizontal Grid lines matching Y-ticks */}
+            {yTicks.map((tv, idx) => {
+              const tickY = PAD_TOP + (1 - (tv - minVal) / valRange) * USABLE_H;
+              return (
+                <Line
+                  key={`grid-${idx}`}
+                  x1={0}
+                  y1={tickY}
+                  x2={totalSvgWidth}
+                  y2={tickY}
+                  stroke="#F1F5F9"
+                  strokeWidth={1}
+                  strokeDasharray="4,4"
+                />
+              );
+            })}
 
-      {/* Interactive Dot Markers */}
-      {points.map((p, i) => (
-        <View
-          key={`dot-${i}`}
-          style={{
-            position: 'absolute',
-            left: p.x - 4,
-            top: p.y - 4,
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: i === points.length - 1 ? color : '#fff',
-            borderWidth: 2,
-            borderColor: color,
-            zIndex: 10,
-          }}
-        />
-      ))}
+            {/* X-Axis baseline */}
+            <Line
+              x1={0}
+              y1={baselineY}
+              x2={totalSvgWidth}
+              y2={baselineY}
+              stroke="#CBD5E1"
+              strokeWidth={1.5}
+            />
+
+            {/* Area gradient under curve */}
+            <Path d={areaPath} fill={`url(#${gradientId})`} />
+
+            {/* Connecting curve line */}
+            <Path
+              d={linePath}
+              stroke={color}
+              strokeWidth={2.5}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* Vertical guide line on selected point */}
+            <Line
+              x1={activePoint.x}
+              y1={PAD_TOP}
+              x2={activePoint.x}
+              y2={baselineY}
+              stroke={color}
+              strokeDasharray="3,3"
+              strokeWidth={1.5}
+              opacity={0.5}
+            />
+
+            {/* Data point dots and X-axis ticks */}
+            {points.map((p, idx) => (
+              <G key={`point-${idx}`}>
+                {/* X-Axis tick line */}
+                <Line
+                  x1={p.x}
+                  y1={baselineY}
+                  x2={p.x}
+                  y2={baselineY + 4}
+                  stroke="#94A3B8"
+                  strokeWidth={1}
+                />
+
+                {/* X-Axis timestamp label */}
+                <SvgText
+                  x={p.x}
+                  y={baselineY + 16}
+                  fontSize={9}
+                  fill={p.isSelected ? '#0F172A' : '#64748B'}
+                  fontWeight={p.isSelected ? 'bold' : 'normal'}
+                  textAnchor="middle"
+                >
+                  {p.timeStr}
+                </SvgText>
+
+                {/* Point dot marker */}
+                {p.isSelected ? (
+                  <>
+                    <Circle cx={p.x} cy={p.y} r={9} fill={color} opacity={0.25} />
+                    <Circle cx={p.x} cy={p.y} r={5} fill={color} stroke="#FFFFFF" strokeWidth={2} />
+                  </>
+                ) : (
+                  <Circle cx={p.x} cy={p.y} r={3.5} fill="#FFFFFF" stroke={color} strokeWidth={2} />
+                )}
+              </G>
+            ))}
+
+            {/* Floating Tooltip Callout on active point */}
+            <G>
+              <Rect
+                x={tooltipX}
+                y={tooltipY}
+                width={tooltipW}
+                height={tooltipH}
+                rx={8}
+                ry={8}
+                fill="#0F172A"
+                opacity={0.92}
+              />
+              <SvgText
+                x={tooltipX + tooltipW / 2}
+                y={tooltipY + 14}
+                fontSize={9}
+                fill="#94A3B8"
+                fontWeight="500"
+                textAnchor="middle"
+              >
+                {activePoint.timeStr}
+              </SvgText>
+              <SvgText
+                x={tooltipX + tooltipW / 2}
+                y={tooltipY + 28}
+                fontSize={11.5}
+                fill="#FFFFFF"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {activePoint.value} {unit}
+              </SvgText>
+            </G>
+          </Svg>
+
+          {/* Interactive touch targets over each data point column */}
+          {points.map((p, idx) => (
+            <TouchableOpacity
+              key={`touch-${idx}`}
+              style={{
+                position: 'absolute',
+                left: p.x - POINT_SPACING / 2,
+                top: 0,
+                width: POINT_SPACING,
+                height: CHART_HEIGHT,
+              }}
+              onPress={() => setSelectedIndex(idx)}
+              activeOpacity={0.6}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Selected Point Inspection Summary Strip */}
+      <View style={styles.chartInspectRow}>
+        <View style={styles.inspectBadge}>
+          <Clock size={11} color="#475569" />
+          <Text style={styles.inspectText}>
+            Thời gian: <Text style={styles.inspectBold}>{activePoint.timeStr}</Text>
+            {activePoint.dateStr ? ` (${activePoint.dateStr})` : ''}
+          </Text>
+        </View>
+
+        <View style={[styles.inspectBadge, { backgroundColor: `${color}14`, borderColor: `${color}40` }]}>
+          <Text style={[styles.inspectText, { color }]}>
+            Số liệu: <Text style={[styles.inspectBold, { color }]}>{activePoint.value} {unit}</Text>
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -211,10 +429,12 @@ function SvgLineChart({
 // ─────────────────────────────────────────────────────
 function SensorGaugeCard({
   reading,
-  trendValues,
+  historyPoints,
+  isOnline,
 }: {
   reading: SensorReadingResponseDTO;
-  trendValues: number[];
+  historyPoints: HistoryPoint[];
+  isOnline: boolean;
 }) {
   const Icon = SENSOR_ICONS[reading.sensorType] || Activity;
   const name = SENSOR_NAMES_VI[reading.sensorType] || reading.sensorDescription || reading.sensorType;
@@ -224,6 +444,11 @@ function SensorGaugeCard({
   const progressPct = Math.min(Math.max((reading.value / maxVal) * 100, 0), 100);
   const chartW = width - spacing.md * 4;
 
+  const readingTime = reading.recordedAt ? new Date(reading.recordedAt) : null;
+  const formattedTime = readingTime && !isNaN(readingTime.getTime())
+    ? readingTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '';
+
   return (
     <Card style={styles.gaugeCard}>
       {/* Header row */}
@@ -232,9 +457,16 @@ function SensorGaugeCard({
           <Icon size={20} color={themeColor} />
         </View>
         <View style={styles.gaugeTitleBox}>
-          <Text style={styles.gaugeName}>{name}</Text>
+          <View style={styles.gaugeTitleRow}>
+            <Text style={styles.gaugeName}>{name}</Text>
+            {!isOnline && (
+              <View style={styles.offlineSmallTag}>
+                <Text style={styles.offlineSmallTagText}>Dữ liệu lưu</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.gaugeTime}>
-            Cập nhật: {new Date(reading.recordedAt).toLocaleTimeString('vi-VN')}
+            {isOnline ? 'Cập nhật:' : 'Lần đo gần nhất:'} {formattedTime || 'Chưa xác định'}
           </Text>
         </View>
         <View style={styles.gaugeValueBox}>
@@ -259,16 +491,22 @@ function SensorGaugeCard({
       {/* Trend chart using SVG */}
       <View style={styles.chartSection}>
         <View style={styles.chartTitleRow}>
-          <TrendingUp size={12} color='#94A3B8' />
+          <TrendingUp size={13} color="#64748B" />
           <Text style={styles.chartLabel}>
-            Diễn biến {trendValues.length} lần đo gần nhất
+            Biểu đồ diễn biến {historyPoints.length} lần đo ({reading.unit})
           </Text>
+          {historyPoints.length > 4 && (
+            <Text style={styles.scrollHintText}>← Vuốt ngang →</Text>
+          )}
         </View>
-        {trendValues.length >= 2 ? (
-          <SvgLineChart data={trendValues} color={themeColor} chartWidth={chartW} />
-        ) : (
-          <Text style={styles.noDataText}>Chưa đủ dữ liệu biểu đồ</Text>
-        )}
+
+        <SvgLineChart
+          data={historyPoints}
+          color={themeColor}
+          unit={reading.unit}
+          sensorType={reading.sensorType}
+          cardWidth={chartW}
+        />
       </View>
     </Card>
   );
@@ -294,6 +532,7 @@ const checkIsActive = (latestReadings: any[], historyReadings: any[] = []) => {
   const lastTime = new Date(maxTime).toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     day: '2-digit',
     month: '2-digit',
   });
@@ -311,7 +550,7 @@ export default function IoTDetailScreen() {
   const [rental, setRental] = useState<any>(null);
   const resolvedPillarCodeRef = useRef<string | null>(null);
   const [readings, setReadings] = useState<SensorReadingResponseDTO[]>([]);
-  const [historyData, setHistoryData] = useState<Record<string, number[]>>({});
+  const [historyData, setHistoryData] = useState<Record<string, HistoryPoint[]>>({});
   const [isOnline, setIsOnline] = useState(false);
   const [lastRecordedTime, setLastRecordedTime] = useState('');
   const [loading, setLoading] = useState(true);
@@ -325,34 +564,74 @@ export default function IoTDetailScreen() {
       const [latest, hist] = await Promise.allSettled(
         codeToUse
           ? [
-              // Fetch by specific pillar code (deviceId) for accurate data (matching FE)
-              iotApi.getLatest(codeToUse),
-              iotApi.getHistory(codeToUse, HISTORY_LIMIT),
-            ]
+            // Fetch by specific pillar code (deviceId) for accurate data (matching FE)
+            iotApi.getLatest(codeToUse),
+            iotApi.getHistory(codeToUse, HISTORY_LIMIT),
+          ]
           : [
-              iotApi.getLatestBySlot(slotId),
-              iotApi.getHistoryBySlot(slotId, HISTORY_LIMIT),
-            ]
+            iotApi.getLatestBySlot(slotId),
+            iotApi.getHistoryBySlot(slotId, HISTORY_LIMIT),
+          ]
       );
 
-      const latestData = latest.status === 'fulfilled' ? (latest.value || []) : [];
-      const histData = hist.status === 'fulfilled' ? (hist.value || []) : [];
+      const latestData: SensorReadingResponseDTO[] = latest.status === 'fulfilled' ? (latest.value || []) : [];
+      const histData: SensorReadingResponseDTO[] = hist.status === 'fulfilled' ? (hist.value || []) : [];
 
       const { isActive, lastTime } = checkIsActive(latestData, histData);
       setIsOnline(isActive);
       setLastRecordedTime(lastTime);
 
-      // Sort and group history
-      const trendMap: Record<string, number[]> = {};
+      // Sort and group history by sensorType with rich timestamp metadata
+      const trendMap: Record<string, HistoryPoint[]> = {};
       histData
         .slice()
+        .filter(r => r && r.sensorType && typeof r.value === 'number')
         .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
         .forEach(r => {
           if (!trendMap[r.sensorType]) trendMap[r.sensorType] = [];
-          trendMap[r.sensorType].push(r.value);
+          const date = new Date(r.recordedAt);
+          const valid = !isNaN(date.getTime());
+          const timeStr = valid
+            ? date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : '';
+          const dateStr = valid
+            ? date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+            : '';
+
+          trendMap[r.sensorType].push({
+            value: Number(r.value.toFixed(2)),
+            recordedAt: r.recordedAt,
+            timeStr,
+            dateStr,
+            fullDateTimeStr: `${timeStr} ${dateStr}`.trim(),
+          });
         });
 
-      setReadings(latestData);
+      // Construct effective readings: if device is offline and latestData is empty,
+      // fallback to the most recent record of each sensorType from histData so cards and charts still render!
+      const readingsMap = new Map<string, SensorReadingResponseDTO>();
+
+      // 1. Populate from history (latest records take priority)
+      histData
+        .slice()
+        .filter(r => r && r.sensorType && typeof r.value === 'number')
+        .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
+        .forEach(r => {
+          if (!readingsMap.has(r.sensorType)) {
+            readingsMap.set(r.sensorType, r);
+          }
+        });
+
+      // 2. Overwrite with latestData if present
+      latestData.forEach(r => {
+        if (r && r.sensorType) {
+          readingsMap.set(r.sensorType, r);
+        }
+      });
+
+      const effectiveReadings = Array.from(readingsMap.values());
+
+      setReadings(effectiveReadings);
       setHistoryData(trendMap);
     } catch {
       // silent
@@ -361,15 +640,20 @@ export default function IoTDetailScreen() {
 
   const loadRentalInfo = useCallback(async () => {
     try {
-      const history = await bookingApi.getHistory();
-      const active = history.find(r => (r.slotId || r.id) == slotId && r.status === 'ACTIVE') || history.find(r => (r.slotId || r.id) == slotId); // eslint-disable-line eqeqeq
+      let active: any = null;
+      try {
+        const history = await bookingApi.getHistory();
+        active = history.find(r => (r.slotId || r.id) == slotId && r.status === 'ACTIVE') || history.find(r => (r.slotId || r.id) == slotId); // eslint-disable-line eqeqeq
+      } catch {
+        // Staff or guest might not have customer booking history
+      }
+
       if (active) {
         const cleanPillars = active.pillars?.filter((p: any) => p.pillarCode !== 'arduino-greenhouse-01') || [];
 
         // If a specific pillar was selected, show only that pillar's info
-        // Support fallback to pillarCode match in case pillarId has type/value mismatch
-        const targetPillar = cleanPillars.find((p: any) => 
-          (pillarId && p.id == pillarId) || 
+        const targetPillar = cleanPillars.find((p: any) =>
+          (pillarId && p.id == pillarId) || // eslint-disable-line eqeqeq
           (routePillarCode && p.pillarCode?.trim().toLowerCase() === routePillarCode.trim().toLowerCase())
         );
 
@@ -395,13 +679,30 @@ export default function IoTDetailScreen() {
         const actualCode = targetPillar?.pillarCode || routePillarCode || (cleanPillars.length === 1 ? cleanPillars[0].pillarCode : null);
         if (actualCode) {
           resolvedPillarCodeRef.current = actualCode;
-          loadReadings(actualCode);
+          await loadReadings(actualCode);
         } else {
-          loadReadings();
+          await loadReadings();
+        }
+      } else {
+        // Fallback for staff or when slot history is not accessible
+        setRental({
+          slotId,
+          slotNumber: `${slotId || '---'}`,
+          locationName: '',
+          treeName: 'Cây trồng',
+          pillarCode: routePillarCode || 'ESP32',
+          capacityHoles: 24,
+        });
+        if (routePillarCode) {
+          resolvedPillarCodeRef.current = routePillarCode;
+          await loadReadings(routePillarCode);
+        } else {
+          await loadReadings();
         }
       }
     } catch (err) {
       console.log('Error loading rental details', err);
+      await loadReadings(routePillarCode);
     }
   }, [slotId, pillarId, routePillarCode, loadReadings]);
 
@@ -476,12 +777,12 @@ export default function IoTDetailScreen() {
                   </Text>
                 </View>
               </View>
-              {rental?.locationName && (
+              {rental?.locationName ? (
                 <View style={[styles.detailInfoRow, { marginTop: 4 }]}>
                   <MapPin size={11} color='rgba(255,255,255,0.7)' />
                   <Text style={styles.detailLocText}>{rental.locationName}</Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </View>
         </View>
@@ -490,15 +791,15 @@ export default function IoTDetailScreen() {
       {/* Section Title */}
       <Text style={styles.sectionHeaderTitle}>Chỉ số thiết bị đo thực tế</Text>
 
-      {/* Sensor gauge cards or offline alert */}
-      {!isOnline ? (
+      {/* Offline Alert Banner (Does NOT hide charts; informs user that charts display last measured data) */}
+      {!isOnline && (
         <Card style={styles.offlineCard}>
           <View style={styles.offlineHeader}>
             <View style={styles.offlineDot} />
-            <Text style={styles.offlineTitle}>Thiết bị ngoại tuyến</Text>
+            <Text style={styles.offlineTitle}>Thiết bị đang ngoại tuyến</Text>
           </View>
           <Text style={styles.offlineDesc}>
-            Trụ hiện chưa kết nối hoặc chưa có tín hiệu cảm biến trong 5 phút qua. Các thẻ chỉ số tức thời đang tạm ẩn số liệu.
+            Trụ hiện chưa có tín hiệu cảm biến mới trong 5 phút qua. Dưới đây là toàn bộ số liệu và biểu đồ đo đạc được lưu lại trước khi thiết bị ngoại tuyến.
           </Text>
           {lastRecordedTime ? (
             <View style={styles.offlineLastTimeRow}>
@@ -507,7 +808,10 @@ export default function IoTDetailScreen() {
             </View>
           ) : null}
         </Card>
-      ) : readings.length === 0 ? (
+      )}
+
+      {/* Sensor gauge cards with interactive charts */}
+      {readings.length === 0 ? (
         <Card style={styles.noDataCard}>
           <Text style={styles.noDataText}>⚠️ Chưa nhận được tín hiệu cảm biến từ trụ này.</Text>
         </Card>
@@ -516,7 +820,14 @@ export default function IoTDetailScreen() {
           <SensorGaugeCard
             key={r.id || r.sensorType}
             reading={r}
-            trendValues={historyData[r.sensorType] || [r.value]}
+            historyPoints={historyData[r.sensorType] || (r.value != null ? [{
+              value: r.value,
+              recordedAt: r.recordedAt,
+              timeStr: r.recordedAt ? new Date(r.recordedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
+              dateStr: r.recordedAt ? new Date(r.recordedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : '',
+              fullDateTimeStr: r.recordedAt ? new Date(r.recordedAt).toLocaleString('vi-VN') : '',
+            }] : [])}
+            isOnline={isOnline}
           />
         ))
       )}
@@ -569,29 +880,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 16,
     color: '#fff',
-  },
-  infoBadgeSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 2,
-  },
-  infoBadgeTree: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: '#D1FAE5',
-    marginTop: 6,
-  },
-  locRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-  },
-  locText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
   },
   detailInfoBlock: {
     marginTop: 8,
@@ -654,7 +942,7 @@ const styles = StyleSheet.create({
     color: '#E2E8F0',
   },
   offlineCard: {
-    padding: spacing.lg,
+    padding: spacing.md,
     backgroundColor: '#FFFBEB',
     borderColor: '#FDE68A',
     borderWidth: 1,
@@ -714,6 +1002,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   noDataText: {
     fontFamily: 'Inter_500Medium',
@@ -725,7 +1017,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 22,
     padding: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -738,7 +1030,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   gaugeIconBox: {
     width: 42,
@@ -750,10 +1042,28 @@ const styles = StyleSheet.create({
   gaugeTitleBox: {
     flex: 1,
   },
+  gaugeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   gaugeName: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
     color: '#1E293B',
+  },
+  offlineSmallTag: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  offlineSmallTagText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 9.5,
+    color: '#B45309',
   },
   gaugeTime: {
     fontFamily: 'Inter_400Regular',
@@ -768,17 +1078,17 @@ const styles = StyleSheet.create({
   },
   gaugeValue: {
     fontFamily: 'Inter_800ExtraBold',
-    fontSize: 24,
+    fontSize: 22,
     letterSpacing: -0.5,
   },
   gaugeUnit: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#94A3B8',
   },
   progressRow: {
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
@@ -814,11 +1124,89 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   chartLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: '#334155',
+    flex: 1,
+  },
+  scrollHintText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  chartWrapper: {
+    marginTop: 4,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FAFCFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  yAxisContainer: {
+    position: 'relative',
+    backgroundColor: '#FAFCFF',
+    zIndex: 10,
+  },
+  yAxisLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 9.5,
+    color: '#94A3B8',
+  },
+  yAxisBorder: {
+    position: 'absolute',
+    right: 0,
+    width: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  chartScrollView: {
+    flex: 1,
+  },
+  chartInspectRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  inspectBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  inspectText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: '#64748B',
+    color: '#475569',
+  },
+  inspectBold: {
+    fontFamily: 'Inter_700Bold',
+    color: '#0F172A',
+  },
+  chartTip: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 6,
+    paddingLeft: 2,
+  },
+  chartEmptyBox: {
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
   },
 });
