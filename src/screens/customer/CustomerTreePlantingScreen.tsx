@@ -47,10 +47,10 @@ import type { CustomerStackProps } from '../../navigation/types';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const QUICK_REASONS = [
-  '🌱 Hết vụ thu hoạch cũ',
-  '🌿 Muốn đổi giống rau mới',
-  '🥬 Gieo bổ sung trụ mới thuê',
-  '🥗 Trồng thêm rau ăn lá cho gia đình',
+  'Hết vụ thu hoạch cũ',
+  'Muốn đổi giống rau mới',
+  'Gieo bổ sung trụ mới thuê',
+  'Trồng thêm rau ăn lá cho gia đình',
 ];
 
 export default function CustomerTreePlantingScreen({ navigation, route }: CustomerStackProps<'CustomerTreePlanting'>) {
@@ -811,7 +811,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                             </>
                           ) : (
                             <>
-                              <Text style={styles.dropdownMainText}>🌿 Toàn bộ các trụ trong ô</Text>
+                              <Text style={styles.dropdownMainText}>Toàn bộ các trụ trong ô</Text>
                               <Text style={styles.dropdownSubText}>
                                 Áp dụng cho tất cả {selectedRental.pillars?.length || selectedRental.pillarCodes?.length || 1} trụ
                               </Text>
@@ -1120,7 +1120,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.dropdownItemTitle, !selectedPillar && styles.dropdownItemTitleSelected]}>
-                      🌿 Toàn bộ các trụ trong ô ({selectedRental.pillars?.length || selectedRental.pillarCodes?.length || 1} trụ)
+                      Toàn bộ các trụ trong ô ({selectedRental.pillars?.length || selectedRental.pillarCodes?.length || 1} trụ)
                     </Text>
                     <Text style={styles.dropdownItemMeta}>Gieo trồng giống cây cho tất cả các trụ</Text>
                   </View>
@@ -1296,7 +1296,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Giống rau:</Text>
                   <Text style={[styles.detailValue, { color: colors.green[700], fontWeight: '700' }]}>
-                    🌱 {selectedDetail.newTreeName || selectedDetail.treeName}
+                    {selectedDetail.newTreeName || selectedDetail.treeName}
                   </Text>
                 </View>
 
@@ -1356,7 +1356,7 @@ export default function CustomerTreePlantingScreen({ navigation, route }: Custom
                 ) : (
                   <View style={[styles.processedBox, { borderColor: selectedDetail.status === 'APPROVED' ? '#86efac' : '#fca5a5' }]}>
                     <Text style={[styles.processedStatusText, { color: selectedDetail.status === 'APPROVED' ? colors.green[700] : '#dc2626' }]}>
-                      {selectedDetail.status === 'APPROVED' ? '🌱 Đồng ý trồng' : '⚠️ Từ chối thực hiện'}
+                      {selectedDetail.status === 'APPROVED' ? 'Đồng ý trồng' : 'Từ chối thực hiện'}
                     </Text>
                     {selectedDetail.processedByName ? (
                       <Text style={styles.processedByText}>

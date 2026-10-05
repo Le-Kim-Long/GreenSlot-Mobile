@@ -420,7 +420,7 @@ export function AddPillarsModal({
             {/* Error Box */}
             {errorMsg ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorBoxText}>⚠️ {errorMsg}</Text>
+                <Text style={styles.errorBoxText}>{errorMsg}</Text>
               </View>
             ) : null}
           </ScrollView>

@@ -107,7 +107,7 @@ export default function GardenStaffAccountScreen({ navigation }: GardenStaffTabP
               <Star size={24} color="#F59E0B" fill="#F59E0B" />
               <View>
                 <Text style={styles.ratingTitle}>Đánh giá trung bình từ khách hàng</Text>
-                <Text style={styles.ratingValue}>{avgRating.toFixed(1)} / 5.0 ⭐</Text>
+                <Text style={styles.ratingValue}>{avgRating.toFixed(1)} / 5.0</Text>
               </View>
             </View>
           </Card>

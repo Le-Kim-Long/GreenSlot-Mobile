@@ -164,9 +164,9 @@ export default function LocationManagementScreen() {
               </View>
 
               <View style={styles.row}>
-                <Text style={styles.infoText}>📐 Diện tích: <Text style={{ fontWeight: '600' }}>{item.area} m²</Text></Text>
+                <Text style={styles.infoText}>Diện tích: <Text style={{ fontWeight: '600' }}>{item.area} m²</Text></Text>
                 {item.contactPhone ? (
-                  <Text style={styles.infoText}>  •  📞 SĐT: <Text style={{ fontWeight: '600' }}>{item.contactPhone}</Text></Text>
+                  <Text style={styles.infoText}>  •  SĐT: <Text style={{ fontWeight: '600' }}>{item.contactPhone}</Text></Text>
                 ) : null}
               </View>
             </View>

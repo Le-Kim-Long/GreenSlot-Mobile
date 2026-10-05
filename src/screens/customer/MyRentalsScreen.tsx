@@ -243,7 +243,7 @@ function HarvestProgress({ startDate, endDate }: { startDate?: string; endDate?:
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <TrendingUp size={11} color={barColor} />
           <Text style={[pStyles.label, { color: barColor }]}>
-            {pct >= 90 ? '🌾 Sắp thu hoạch' : `Tiến trình hợp đồng: ${pct}%`}
+            {pct >= 90 ? 'Sắp thu hoạch' : `Tiến trình hợp đồng: ${pct}%`}
           </Text>
         </View>
         <Text style={pStyles.daysLeft}>
@@ -538,7 +538,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                     <View style={styles.pillarsRow}>
                       <View style={styles.pillarBadge}>
                         <Text style={styles.pillarBadgeText} numberOfLines={1}>
-                          🌱 {item.pillars![0].pillarCode}
+                          {item.pillars![0].pillarCode}
                           {item.pillars![0].treeName ? ` · ${item.pillars![0].treeName}` : ''}
                         </Text>
                       </View>
@@ -549,7 +549,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                       )}
                     </View>
                   ) : item.treeName ? (
-                    <Text style={styles.cardTree}>🌱 {item.treeName}</Text>
+                    <Text style={styles.cardTree}>{item.treeName}</Text>
                   ) : null}
 
                   {/* Thời hạn hợp đồng */}
@@ -594,7 +594,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
 
                   {item.expectedHarvestAt && new Date(item.expectedHarvestAt).getTime() > Date.now() && (
                     <View style={styles.earlyHarvestBadge}>
-                      <Text style={styles.earlyHarvestText}>⚡ Thu hoạch sớm</Text>
+                      <Text style={styles.earlyHarvestText}>Thu hoạch sớm</Text>
                     </View>
                   )}
 
@@ -608,7 +608,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                   {/* Evidence photo & staff notes */}
                   {item.harvestEvidenceImageUrl && (
                     <View style={styles.harvestEvidenceCard}>
-                      <Text style={styles.harvestEvidenceLabel}>📷 Ảnh cây thực tế (Nhân viên gửi):</Text>
+                      <Text style={styles.harvestEvidenceLabel}>Ảnh cây thực tế (Nhân viên gửi):</Text>
                       <TouchableOpacity
                         style={styles.harvestImageWrapper}
                         onPress={e => {
@@ -623,7 +623,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
                           resizeMode="cover"
                         />
                         <View style={styles.harvestImageOverlay}>
-                          <Text style={styles.harvestImageOverlayText}>🔍 Bấm để phóng to</Text>
+                          <Text style={styles.harvestImageOverlayText}>Bấm để phóng to</Text>
                         </View>
                       </TouchableOpacity>
 
@@ -802,7 +802,7 @@ export default function MyRentalsScreen({ navigation }: CustomerTabProps<'Rental
               {/* ── Completed hint + Harvest History link ── */}
               {item.status === 'COMPLETED' && (
                 <View style={styles.completedHint}>
-                  <Text style={styles.completedHintText}>✅ Hợp đồng đã hoàn thành</Text>
+                  <Text style={styles.completedHintText}>Hợp đồng đã hoàn thành</Text>
                   <TouchableOpacity
                     style={styles.btnHistoryCompact}
                     onPress={e => {

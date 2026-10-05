@@ -167,7 +167,7 @@ function ItemizedBreakdown({ txn }: { txn: PaymentItem }) {
             <View key={p.pillarCode || pIdx} style={bStyles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={bStyles.rowTitleGreen} numberOfLines={1}>
-                  🌱 {p.treeName || txn.treeName || 'Phôi giống thủy canh'} (Trụ {p.pillarCode})
+                  {p.treeName || txn.treeName || 'Phôi giống thủy canh'} (Trụ {p.pillarCode})
                 </Text>
                 <Text style={bStyles.rowDesc}>
                   Cung cấp giống cho Trụ {p.pillarCode} ({p.capacityHoles || 24} hốc)
@@ -186,7 +186,7 @@ function ItemizedBreakdown({ txn }: { txn: PaymentItem }) {
           <View style={bStyles.row}>
             <View style={{ flex: 1 }}>
               <Text style={bStyles.rowTitleGreen} numberOfLines={1}>
-                🌱 {txn.treeName || 'Phôi giống rau thủy canh'}
+                {txn.treeName || 'Phôi giống rau thủy canh'}
               </Text>
               <Text style={bStyles.rowDesc}>
                 {isSinglePillarPlant
@@ -364,12 +364,12 @@ export default function PaymentHistoryScreen({ navigation }: Partial<CustomerSta
 
     const pillarsRows = txn.pillars && txn.pillars.length > 0
       ? txn.pillars.map(p =>
-          `<tr><td>🌱 Trụ ${p.pillarCode} (${p.capacityHoles || 24} hốc)</td><td>${p.treeName || txn.treeName || '--'}</td></tr>`
+          `<tr><td>Trụ ${p.pillarCode} (${p.capacityHoles || 24} hốc)</td><td>${p.treeName || txn.treeName || '--'}</td></tr>`
         ).join('')
       : txn.targetPillarCode
-        ? `<tr><td>🌱 Trụ ${txn.targetPillarCode} (${txn.targetPillarHoles || 24} hốc)</td><td>${txn.treeName || '--'}</td></tr>`
+        ? `<tr><td>Trụ ${txn.targetPillarCode} (${txn.targetPillarHoles || 24} hốc)</td><td>${txn.treeName || '--'}</td></tr>`
         : txn.treeName
-          ? `<tr><td colspan="2">🌱 ${txn.treeName}</td></tr>`
+          ? `<tr><td colspan="2">${txn.treeName}</td></tr>`
           : '';
 
     return `<!DOCTYPE html>
@@ -411,7 +411,7 @@ export default function PaymentHistoryScreen({ navigation }: Partial<CustomerSta
 <body>
   <div class="page">
     <div class="header">
-      <div class="logo">🌿 GreenSlot</div>
+      <div class="logo">GreenSlot</div>
       <div class="subtitle">Nền tảng canh tác nông nghiệp thông minh</div>
       <div class="inv-title">HÓA ĐƠN DỊCH VỤ ĐIỆN TỬ</div>
       <div class="inv-ref">Mã GD: ${txn.vnpTxnRef || `INV-${txn.id}`}</div>
@@ -617,19 +617,19 @@ export default function PaymentHistoryScreen({ navigation }: Partial<CustomerSta
                   {/* Thông tin cây trồng */}
                   {item.kind === 'PLANT' && item.targetPillarCode && item.targetPillarCode !== 'Toàn bộ các trụ' ? (
                     <Text style={styles.treeRow} numberOfLines={1}>
-                      🌱 Trụ {item.targetPillarCode}: {item.treeName || '--'}
+                      Trụ {item.targetPillarCode}: {item.treeName || '--'}
                     </Text>
                   ) : item.pillars && item.pillars.length > 0 ? (
                     <View style={styles.pillarsInline}>
                       {item.pillars.slice(0, 2).map((p, idx) => (
-                        <Text key={idx} style={styles.pillarInlineTag}>🌱 {p.pillarCode}</Text>
+                        <Text key={idx} style={styles.pillarInlineTag}>{p.pillarCode}</Text>
                       ))}
                       {item.pillars.length > 2 && (
                         <Text style={styles.pillarInlineMore}>+{item.pillars.length - 2}</Text>
                       )}
                     </View>
                   ) : item.treeName ? (
-                    <Text style={styles.treeRow}>🌱 {item.treeName}</Text>
+                    <Text style={styles.treeRow}>{item.treeName}</Text>
                   ) : null}
 
                   <Text style={styles.date}>
@@ -801,7 +801,7 @@ export default function PaymentHistoryScreen({ navigation }: Partial<CustomerSta
                       <View style={styles.pillarsWrap}>
                         <View style={styles.pillarTagAlt}>
                           <Text style={styles.pillarTagAltText}>
-                            🏷️ Trụ {selectedTxn.targetPillarCode} ({selectedTxn.targetPillarHoles || 24} hốc): 🌱 {selectedTxn.treeName}
+                            Trụ {selectedTxn.targetPillarCode} ({selectedTxn.targetPillarHoles || 24} hốc): {selectedTxn.treeName}
                           </Text>
                         </View>
                       </View>
@@ -813,7 +813,7 @@ export default function PaymentHistoryScreen({ navigation }: Partial<CustomerSta
                         {selectedTxn.pillars.map((p, idx) => (
                           <View key={idx} style={styles.pillarTag}>
                             <Text style={styles.pillarTagText}>
-                              Trụ {p.pillarCode} ({p.capacityHoles || 24} hốc): 🌱 {p.treeName || selectedTxn.treeName || 'Đang canh tác'}
+                              Trụ {p.pillarCode} ({p.capacityHoles || 24} hốc): {p.treeName || selectedTxn.treeName || 'Đang canh tác'}
                             </Text>
                           </View>
                         ))}
@@ -822,7 +822,7 @@ export default function PaymentHistoryScreen({ navigation }: Partial<CustomerSta
                   ) : selectedTxn.treeName ? (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Giống cây đăng ký:</Text>
-                      <Text style={styles.treeHighlight}>🌱 {selectedTxn.treeName}</Text>
+                      <Text style={styles.treeHighlight}>{selectedTxn.treeName}</Text>
                     </View>
                   ) : null}
 

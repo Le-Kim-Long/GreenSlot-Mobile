@@ -458,15 +458,15 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
         {/* Garden Info Grid */}
         <View style={styles.gridInfo}>
           <View style={styles.gridInfoItem}>
-            <Text style={styles.gridInfoLabel}>📐 Diện tích ô vườn</Text>
+            <Text style={styles.gridInfoLabel}>Diện tích ô vườn</Text>
             <Text style={styles.gridInfoValue}>{slotArea.toFixed(1)} m²</Text>
           </View>
           <View style={styles.gridInfoItem}>
-            <Text style={styles.gridInfoLabel}>🔋 Năng suất đã chọn</Text>
+            <Text style={styles.gridInfoLabel}>Năng suất đã chọn</Text>
             <Text style={styles.gridInfoValue}>{totalHoles} hốc ({totalPillarsCount} trụ)</Text>
           </View>
           <View style={[styles.gridInfoItem, { borderRightWidth: 0 }]}>
-            <Text style={styles.gridInfoLabel}>🏢 Cơ sở nhà vườn</Text>
+            <Text style={styles.gridInfoLabel}>Cơ sở nhà vườn</Text>
             <Text style={styles.gridInfoValue} numberOfLines={1}>{slot.locationName || 'Cơ sở 1'}</Text>
           </View>
         </View>
@@ -490,7 +490,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
 
         {/* Customize Pillar Counts */}
         <Card style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>⚙️ Tùy Chỉnh Các Loại Trụ Canh Tác Trong Ô</Text>
+          <Text style={styles.sectionTitle}>Tùy Chỉnh Các Loại Trụ Canh Tác Trong Ô</Text>
           <Text style={styles.sectionDesc}>Tự do tăng/giảm số lượng trụ phù hợp theo diện tích ô đất của bạn</Text>
 
           {/* Large Pillar */}
@@ -576,7 +576,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
         {totalPillarsCount > 0 && (
           <Card style={styles.cardSection}>
             <View style={styles.seedHeader}>
-              <Text style={styles.sectionTitle}>🌱 Chọn Giống Rau / Cây Trồng Thủy Canh</Text>
+              <Text style={styles.sectionTitle}>Chọn Giống Rau / Cây Trồng Thủy Canh</Text>
             </View>
             <Text style={styles.sectionDesc}>Gán giống chung cho toàn bộ hoặc chọn riêng giống rau khác nhau trên từng trụ</Text>
 
@@ -663,7 +663,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
                   >
                     {isOutOfStock && (
                       <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#dc2626' }}>❌ Tạm hết hàng trong kho</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#dc2626' }}>Tạm hết hàng trong kho</Text>
                       </View>
                     )}
                     <View style={styles.treeCardHeader}>
@@ -681,7 +681,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
 
                     {isExceeded && (
                       <View style={styles.treeWarningBadge}>
-                        <Text style={styles.treeWarningText}>⚠️ Cần thuê ≥ {Math.ceil((t.minRentalDays || 0) / 30)} tháng</Text>
+                        <Text style={styles.treeWarningText}>Cần thuê ≥ {Math.ceil((t.minRentalDays || 0) / 30)} tháng</Text>
                       </View>
                     )}
 
@@ -785,7 +785,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
             {landPrice > 0 && (
               <View style={styles.billRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.billLabel}>📍 Phí thuê đất ({slotArea.toFixed(1)} m²):</Text>
+                  <Text style={styles.billLabel}>Phí thuê đất ({slotArea.toFixed(1)} m²):</Text>
                 </View>
                 <Text style={styles.billValue}>
                   {formatCurrency(landPrice)} x {selectedMonths}th = {formatCurrency(landPrice * selectedMonths)}
@@ -811,7 +811,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
             {/* IoT & System Irrigation Included */}
             <View style={styles.billRowMuted}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.billLabelMuted}>🔬 Thiết bị đo IoT & Hệ thống tưới:</Text>
+                <Text style={styles.billLabelMuted}>Thiết bị đo IoT & Hệ thống tưới:</Text>
                 <Text style={styles.billSubMuted}>• Cảm biến pH, ẩm, ánh sáng & bơm tự động 24/7</Text>
               </View>
               <Text style={styles.billValueFree}>Đã bao gồm</Text>
@@ -819,7 +819,7 @@ export default function GardenDetailScreen({ route, navigation }: CustomerStackP
 
             {/* Gateway & Tax */}
             {/* <View style={styles.billRowMuted}>
-              <Text style={styles.billLabelMuted}>💳 Thuế GTGT & Phí nền tảng:</Text>
+              <Text style={styles.billLabelMuted}>Thuế GTGT & Phí nền tảng:</Text>
               <Text style={styles.billValueFree}>0đ</Text>
             </View> */}
 

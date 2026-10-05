@@ -353,7 +353,6 @@ export default function IoTMonitoringScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.dropdownTriggerText} numberOfLines={1}>
-            {filterSlotId === 'all' ? '🌐 ' : '🌱 '}
             {getSelectedLabel()}
           </Text>
           <ChevronDown size={16} color='#475569' style={{ marginLeft: 8 }} />
@@ -387,7 +386,7 @@ export default function IoTMonitoringScreen() {
                     onPress={() => { setFilterSlotId('all'); setDropdownOpen(false); }}
                   >
                     <Text style={[styles.dropdownItemText, filterSlotId === 'all' && styles.dropdownItemTextActive]}>
-                      🌐 Tất cả các trụ (Bảng tổng hợp)
+                      Tất cả các trụ (Bảng tổng hợp)
                     </Text>
                   </TouchableOpacity>
                   {/* Scrollable list — max 6 items */}
@@ -406,7 +405,7 @@ export default function IoTMonitoringScreen() {
                           onPress={() => { setFilterSlotId(itemKey); setDropdownOpen(false); }}
                         >
                           <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextActive]}>
-                            🌱 Trụ {item.pillarCode} - Ô {item.slotNumber} ({item.capacityHoles || 24} hốc)
+                            Trụ {item.pillarCode} - Ô {item.slotNumber} ({item.capacityHoles || 24} hốc)
                           </Text>
                         </TouchableOpacity>
                       );

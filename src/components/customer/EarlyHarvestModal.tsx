@@ -227,7 +227,7 @@ export function EarlyHarvestModal({
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.pillarOptionLabel, selectedPillar === '' && styles.pillarOptionLabelActive]}>
-                      🌱 Tất cả các trụ đang canh tác trong ô
+                      Tất cả các trụ đang canh tác trong ô
                     </Text>
                     <Text style={styles.pillarOptionSub}>
                       {hasPlantedPillars
@@ -277,7 +277,7 @@ export function EarlyHarvestModal({
                           </Text>
                           {canHarvest ? (
                             <View style={styles.treeBadge}>
-                              <Text style={styles.treeBadgeText}>🌱 {p.treeName}</Text>
+                              <Text style={styles.treeBadgeText}>{p.treeName}</Text>
                             </View>
                           ) : (
                             <View style={styles.emptyBadge}>
@@ -382,7 +382,7 @@ export function EarlyHarvestModal({
 
             {error ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>⚠️ {error}</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
           </ScrollView>

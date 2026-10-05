@@ -145,7 +145,7 @@ export default function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'
     try {
       const jwtData = await authApi.verifyOtp({ email, otp });
       triggerSuccess();
-      Alert.alert('🎉 Đăng nhập thành công', 'Chào mừng bạn đến với GreenSlot!');
+      Alert.alert('Đăng nhập thành công', 'Chào mừng bạn đến với GreenSlot!');
       await new Promise(r => setTimeout(r, 800));
       await loginWithJwtData(jwtData);
     } catch (err: any) {
@@ -166,7 +166,7 @@ export default function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'
     setResending(true);
     try {
       await authApi.resendOtp(email);
-      Alert.alert('Đã gửi lại ✉️', 'Mã xác thực mới đã được gửi vào email.');
+      Alert.alert('Đã gửi lại', 'Mã xác thực mới đã được gửi vào email.');
       setCountdown(RESEND_COOLDOWN);
       setDigits(Array(OTP_LENGTH).fill(''));
       setTimeout(() => { inputRefs.current[0]?.focus(); setFocused(0); }, 100);

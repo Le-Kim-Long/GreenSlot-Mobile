@@ -210,7 +210,7 @@ export function ExtendRentalModal({
               </View>
 
               {extendMonthsError ? (
-                <Text style={styles.inputErrorText}>⚠️ {extendMonthsError}</Text>
+                <Text style={styles.inputErrorText}>{extendMonthsError}</Text>
               ) : null}
 
               {/* Quick Select Chips */}
@@ -244,12 +244,12 @@ export function ExtendRentalModal({
             {/* Date Extension Preview */}
             <View style={styles.datePreviewCard}>
               <View style={styles.dateBlock}>
-                <Text style={styles.dateBlockLabel}>📅 Hạn hiện tại</Text>
+                <Text style={styles.dateBlockLabel}>Hạn hiện tại</Text>
                 <Text style={styles.dateBlockValue}>{rental.endDate}</Text>
               </View>
               <ChevronRight size={18} color={colors.green[600]} />
               <View style={styles.dateBlock}>
-                <Text style={styles.dateBlockLabel}>🏁 Hạn mới dự kiến</Text>
+                <Text style={styles.dateBlockLabel}>Hạn mới dự kiến</Text>
                 <Text style={[styles.dateBlockValue, { color: colors.emerald[700] }]}>
                   {newEndDate}
                 </Text>
@@ -323,7 +323,7 @@ export function ExtendRentalModal({
             {/* Error Message */}
             {extendError ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorBoxText}>⚠️ {extendError}</Text>
+                <Text style={styles.errorBoxText}>{extendError}</Text>
               </View>
             ) : null}
           </ScrollView>

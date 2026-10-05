@@ -123,7 +123,7 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
       const result = await login(username.trim(), password);
       if (result === true) {
         showInAppNotification({
-          title: '🎉 Đăng nhập thành công',
+          title: 'Đăng nhập thành công',
           body: `Chào mừng trở lại, ${username.trim()}!`,
           variant: 'success',
         });
@@ -179,7 +179,7 @@ export default function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
       const result = await loginWithGoogle(idToken, 'login');
       if (result === true) {
         showInAppNotification({
-          title: '🎉 Đăng nhập thành công',
+          title: 'Đăng nhập thành công',
           body: 'Chào mừng bạn đến với GreenSlot!',
           variant: 'success',
         });

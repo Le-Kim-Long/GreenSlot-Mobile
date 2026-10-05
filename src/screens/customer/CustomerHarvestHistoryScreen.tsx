@@ -728,7 +728,7 @@ export default function CustomerHarvestHistoryScreen({
                     {/* Highlight banner from direct notification */}
                     {isHighlighted && (
                       <View style={styles.highlightBanner}>
-                        <Text style={styles.highlightBannerText}>🔔 Vừa thu hoạch xong</Text>
+                        <Text style={styles.highlightBannerText}>Vừa thu hoạch xong</Text>
                       </View>
                     )}
 
@@ -765,12 +765,12 @@ export default function CustomerHarvestHistoryScreen({
                     <View style={styles.batchTimeline}>
                       {batch.plantedAt && (
                         <View style={styles.timelineItem}>
-                          <Text style={styles.timelineLabel}>🌱 Ngày gieo:</Text>
+                          <Text style={styles.timelineLabel}>Ngày gieo:</Text>
                           <Text style={styles.timelineValue}>{formatDate(batch.plantedAt)}</Text>
                         </View>
                       )}
                       <View style={styles.timelineItem}>
-                        <Text style={styles.timelineLabel}>🌾 Thu hoạch:</Text>
+                        <Text style={styles.timelineLabel}>Thu hoạch:</Text>
                         <Text style={styles.timelineValueBold}>{formatDate(batch.harvestedAt)}</Text>
                       </View>
                       {batch.daysGrown != null && (

@@ -209,7 +209,7 @@ export default function CustomerNotificationsScreen() {
                 resizeMode="cover"
               />
               <View style={styles.imageOverlayHint}>
-                <Text style={styles.imageOverlayText}>🔍 Bấm xem ảnh thực tế</Text>
+                <Text style={styles.imageOverlayText}>Bấm xem ảnh thực tế</Text>
               </View>
             </TouchableOpacity>
           )}

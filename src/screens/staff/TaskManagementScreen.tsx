@@ -287,7 +287,7 @@ export default function TaskManagementScreen() {
               {item.evidenceImageUrl ? (
                 <View style={styles.evidenceRow}>
                   <Image source={{ uri: item.evidenceImageUrl }} style={styles.evidenceThumb} resizeMode="cover" />
-                  <Text style={styles.evidenceInfo}>📸 Đã có ảnh bằng chứng</Text>
+                  <Text style={styles.evidenceInfo}>Đã có ảnh bằng chứng</Text>
                 </View>
               ) : null}
 
@@ -356,7 +356,7 @@ export default function TaskManagementScreen() {
                   ) : null}
                   {selectedTask.rejectionReason ? (
                     <View style={styles.rejectionBox}>
-                      <Text style={styles.rejectionBoxText}>⚠️ Lý do từ chối: {selectedTask.rejectionReason}</Text>
+                      <Text style={styles.rejectionBoxText}>Lý do từ chối: {selectedTask.rejectionReason}</Text>
                     </View>
                   ) : null}
                   <Text style={styles.label}>Hình ảnh bằng chứng:</Text>
@@ -371,11 +371,11 @@ export default function TaskManagementScreen() {
                   <Text style={styles.detailTitle}>{selectedTask.taskName}</Text>
                   <Text style={styles.detailSub}>Nhân viên: {selectedTask.assignedStaffName || 'N/A'} · Ô: {selectedTask.targetSlotNumber}</Text>
                   
-                  <Text style={styles.label}>📸 Ảnh Bằng Chứng từ Nhân Viên:</Text>
+                  <Text style={styles.label}>Ảnh Bằng Chứng từ Nhân Viên:</Text>
                   {selectedTask.evidenceImageUrl ? (
                     <Image source={{ uri: selectedTask.evidenceImageUrl }} style={styles.largeEvidence} resizeMode="contain" />
                   ) : (
-                    <Text style={styles.emptyImgText}>⚠️ Không tìm thấy ảnh bằng chứng.</Text>
+                    <Text style={styles.emptyImgText}>Không tìm thấy ảnh bằng chứng.</Text>
                   )}
 
                   <Text style={styles.label}>Quyết định phê duyệt:</Text>

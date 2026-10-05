@@ -813,7 +813,7 @@ export default function IoTDetailScreen() {
       {/* Sensor gauge cards with interactive charts */}
       {readings.length === 0 ? (
         <Card style={styles.noDataCard}>
-          <Text style={styles.noDataText}>⚠️ Chưa nhận được tín hiệu cảm biến từ trụ này.</Text>
+          <Text style={styles.noDataText}>Chưa nhận được tín hiệu cảm biến từ trụ này.</Text>
         </Card>
       ) : (
         readings.map(r => (

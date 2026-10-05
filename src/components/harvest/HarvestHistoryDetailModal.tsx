@@ -74,7 +74,7 @@ export function HarvestHistoryDetailModal({
                     <Text style={styles.headerTitle}>Đợt thu hoạch #{item.id}</Text>
                     {item.isEarlyHarvest ? (
                       <View style={styles.earlyHarvestBadge}>
-                        <Text style={styles.earlyHarvestText}>⚡ Thu hoạch sớm</Text>
+                        <Text style={styles.earlyHarvestText}>Thu hoạch sớm</Text>
                       </View>
                     ) : (
                       <View style={styles.normalHarvestBadge}>
@@ -285,7 +285,7 @@ export function HarvestHistoryDetailModal({
                           resizeMode="cover"
                         />
                         <View style={styles.zoomHintBadge}>
-                          <Text style={styles.zoomHintText}>🔍 Phóng to</Text>
+                          <Text style={styles.zoomHintText}>Phóng to</Text>
                         </View>
                       </TouchableOpacity>
                     ))}

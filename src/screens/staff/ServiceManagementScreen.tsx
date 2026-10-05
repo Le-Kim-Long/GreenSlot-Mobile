@@ -186,7 +186,7 @@ export default function ServiceManagementScreen() {
           <View style={styles.cardInfo}>
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardSub}>
-              {cat ? `📂 ${cat.name}  ·  ` : ''}{item.price?.toLocaleString('vi-VN')}₫
+              {cat ? `${cat.name}  ·  ` : ''}{item.price?.toLocaleString('vi-VN')}₫
             </Text>
             {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
           </View>
@@ -244,7 +244,7 @@ export default function ServiceManagementScreen() {
       {activeTab === 'services' && !loading && categories.length === 0 && (
         <TouchableOpacity style={styles.warningBox} onPress={() => setActiveTab('categories')}>
           <Text style={styles.warningText}>
-            ⚠️ Chưa có danh mục nào. Nhấn vào đây để tạo danh mục trước.
+            Chưa có danh mục nào. Nhấn vào đây để tạo danh mục trước.
           </Text>
         </TouchableOpacity>
       )}

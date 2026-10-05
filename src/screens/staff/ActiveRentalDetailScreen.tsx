@@ -104,14 +104,14 @@ export default function ActiveRentalDetailScreen({ route, navigation }: Props) {
           <View style={styles.cardBody}>
             <View style={styles.dateRangeWrapper}>
               <View style={styles.dateBox}>
-                <Text style={styles.dateBoxLabel}>📅 Ngày bắt đầu</Text>
+                <Text style={styles.dateBoxLabel}>Ngày bắt đầu</Text>
                 <Text style={styles.dateBoxValue}>{formatDate(rental.startTime)}</Text>
               </View>
               <View style={styles.dateSeparator}>
                 <Text style={styles.separatorText}>→</Text>
               </View>
               <View style={styles.dateBox}>
-                <Text style={styles.dateBoxLabel}>🏁 Ngày kết thúc</Text>
+                <Text style={styles.dateBoxLabel}>Ngày kết thúc</Text>
                 <Text style={styles.dateBoxValue}>{formatDate(rental.endTime)}</Text>
               </View>
             </View>

@@ -124,12 +124,12 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
       setRental(prev => prev ? { ...prev, harvestDecision: decision } : null);
       if (decision === 'SELF') {
         Alert.alert(
-          'Đã ghi nhận! 🌾',
+          'Đã ghi nhận!',
           'Bạn đã chọn tự thu hoạch. Dữ liệu đã được lưu vào lịch sử thu hoạch.'
         );
       } else {
         Alert.alert(
-          'Đã gửi yêu cầu! ✅',
+          'Đã gửi yêu cầu!',
           'Nhân viên sẽ tiến hành thu hoạch và bàn giao cho bạn trong thời gian sớm nhất.'
         );
       }
@@ -374,7 +374,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
 
             {rental.expectedHarvestAt && new Date(rental.expectedHarvestAt).getTime() > Date.now() && (
               <View style={styles.earlyHarvestBadge}>
-                <Text style={styles.earlyHarvestText}>⚡ Thu hoạch sớm</Text>
+                <Text style={styles.earlyHarvestText}>Thu hoạch sớm</Text>
               </View>
             )}
 
@@ -388,7 +388,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             {/* Evidence image & staff notes */}
             {rental.harvestEvidenceImageUrl && (
               <View style={styles.harvestEvidenceCard}>
-                <Text style={styles.harvestEvidenceLabel}>📷 Ảnh cây thực tế (Nhân viên gửi):</Text>
+                <Text style={styles.harvestEvidenceLabel}>Ảnh cây thực tế (Nhân viên gửi):</Text>
                 <TouchableOpacity
                   style={styles.harvestImageWrapper}
                   onPress={() => setPreviewImage(rental.harvestEvidenceImageUrl!)}
@@ -400,7 +400,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                     resizeMode="cover"
                   />
                   <View style={styles.harvestImageOverlay}>
-                    <Text style={styles.harvestImageOverlayText}>🔍 Bấm để phóng to</Text>
+                    <Text style={styles.harvestImageOverlayText}>Bấm để phóng to</Text>
                   </View>
                 </TouchableOpacity>
 
@@ -596,7 +596,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                   <View style={{ flex: 1 }}>
                     <Text style={styles.pillarCode}>Trụ {p.pillarCode}</Text>
                     {treeName ? (
-                      <Text style={styles.pillarTree}>🌱 {treeName}</Text>
+                      <Text style={styles.pillarTree}>{treeName}</Text>
                     ) : (
                       <Text style={styles.pillarEmpty}>Chưa chọn giống cây (Đã thu hoạch)</Text>
                     )}
@@ -677,7 +677,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
                 </Text>
                 {rental.expectedHarvestAt && (
                   <Text style={{ fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.gray[500], marginTop: 2 }}>
-                    📅 Dự kiến thu hoạch: {formatDate(rental.expectedHarvestAt)}
+                    Dự kiến thu hoạch: {formatDate(rental.expectedHarvestAt)}
                   </Text>
                 )}
               </View>
@@ -713,14 +713,14 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
           {/* Date Range */}
           <View style={styles.dateRangeCard}>
             <View style={styles.dateBlock}>
-              <Text style={styles.dateBlockLabel}>📅 Ngày bắt đầu</Text>
+              <Text style={styles.dateBlockLabel}>Ngày bắt đầu</Text>
               <Text style={styles.dateBlockValue}>{formatDate(rental.startDate)}</Text>
             </View>
             <View style={styles.dateArrow}>
               <ChevronRight size={20} color={colors.green[400]} />
             </View>
             <View style={styles.dateBlock}>
-              <Text style={styles.dateBlockLabel}>🏁 Ngày kết thúc</Text>
+              <Text style={styles.dateBlockLabel}>Ngày kết thúc</Text>
               <Text style={styles.dateBlockValue}>{formatDate(rental.endDate)}</Text>
             </View>
           </View>
@@ -783,7 +783,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             </View>
 
             {monthsError ? (
-              <Text style={styles.monthInputErrText}>⚠️ {monthsError}</Text>
+              <Text style={styles.monthInputErrText}>{monthsError}</Text>
             ) : null}
 
             {/* Quick Chips */}
@@ -811,14 +811,14 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             {/* New date range preview */}
             <View style={styles.dateRangeCard}>
               <View style={styles.dateBlock}>
-                <Text style={styles.dateBlockLabel}>📅 Bắt đầu gia hạn</Text>
+                <Text style={styles.dateBlockLabel}>Bắt đầu gia hạn</Text>
                 <Text style={styles.dateBlockValue}>{formatDate(rental.endDate)}</Text>
               </View>
               <View style={styles.dateArrow}>
                 <ChevronRight size={20} color={colors.green[400]} />
               </View>
               <View style={styles.dateBlock}>
-                <Text style={styles.dateBlockLabel}>🏁 Kết thúc mới</Text>
+                <Text style={styles.dateBlockLabel}>Kết thúc mới</Text>
                 <Text style={[styles.dateBlockValue, { color: colors.green[700] }]}>
                   {formatDateObj(newEndDate)}
                 </Text>
@@ -886,7 +886,7 @@ export default function RentalDetailScreen({ route, navigation }: CustomerStackP
             />
 
             <Text style={styles.noteText}>
-              💡 Hệ thống sẽ chuyển bạn đến VNPay để hoàn tất thanh toán.
+              Hệ thống sẽ chuyển bạn đến VNPay để hoàn tất thanh toán.
             </Text>
           </View>
         )}

@@ -34,7 +34,7 @@ const STATUS_CONFIG: Record<PaymentStatus, StatusConfig> = {
     iconColor: colors.green[600],
     bgColor: '#f0fdf4',
     ringColor: colors.green[100],
-    title: '🎉 Thanh toán thành công!',
+    title: 'Thanh toán thành công!',
     subtitle: 'Giao dịch đã được xác nhận. Ô vườn của bạn đã được kích hoạt.',
     buttonLabel: 'Xem vườn đang thuê',
     buttonColor: colors.green[600],
@@ -44,7 +44,7 @@ const STATUS_CONFIG: Record<PaymentStatus, StatusConfig> = {
     iconColor: '#dc2626',
     bgColor: '#fef2f2',
     ringColor: '#fee2e2',
-    title: '❌ Thanh toán thất bại',
+    title: 'Thanh toán thất bại',
     subtitle: 'Giao dịch không thành công hoặc đã bị hủy. Vui lòng thử lại.',
     buttonLabel: 'Quay lại',
     buttonColor: '#dc2626',
@@ -91,37 +91,37 @@ export default function PaymentResultScreen({
 
   if (isTreePayment) {
     if (isSuccess) {
-      displayTitle = '🌱 Thanh toán phôi giống thành công!';
+      displayTitle = 'Thanh toán phôi giống thành công!';
       displaySubtitle = 'Thanh toán mua phôi giống thành công. Yêu cầu trồng cây của bạn đã được ghi nhận và đang chờ nhà vườn phê duyệt.';
       displayButtonLabel = 'Xem yêu cầu trồng cây';
     } else if (status === 'failed') {
-      displayTitle = '❌ Thanh toán phôi giống thất bại';
+      displayTitle = 'Thanh toán phôi giống thất bại';
       displaySubtitle = 'Thanh toán phôi giống không thành công. Vui lòng thử lại.';
       displayButtonLabel = 'Quay lại';
     }
   } else if (isAddPillar) {
     if (isSuccess) {
-      displayTitle = '🎉 Thuê thêm trụ thành công!';
+      displayTitle = 'Thuê thêm trụ thành công!';
       displaySubtitle = `Bạn đã thuê bổ sung trụ cho ô vườn ${slotNumber || ''} thành công.`;
       displayButtonLabel = 'Xem ô vườn vừa thuê trụ';
     } else if (status === 'failed') {
-      displayTitle = '❌ Thuê trụ không thành công';
+      displayTitle = 'Thuê trụ không thành công';
       displaySubtitle = 'Giao dịch thuê trụ không thành công hoặc đã bị hủy. Vui lòng thử lại.';
       displayButtonLabel = 'Quay lại';
     }
   } else if (isExtend) {
     if (isSuccess) {
-      displayTitle = '🎉 Gia hạn hợp đồng thành công!';
+      displayTitle = 'Gia hạn hợp đồng thành công!';
       displaySubtitle = `Ô vườn ${slotNumber || ''} của bạn đã được gia hạn thời gian thuê thành công.`;
       displayButtonLabel = 'Xem ô vườn vừa gia hạn';
     } else if (status === 'failed') {
-      displayTitle = '❌ Gia hạn hợp đồng thất bại';
+      displayTitle = 'Gia hạn hợp đồng thất bại';
       displaySubtitle = 'Giao dịch gia hạn không thành công hoặc đã bị hủy. Vui lòng thử lại.';
       displayButtonLabel = 'Quay lại';
     }
   } else {
     if (isSuccess) {
-      displayTitle = '🎉 Thuê ô vườn thành công!';
+      displayTitle = 'Thuê ô vườn thành công!';
       displaySubtitle = `Giao dịch đã được xác nhận. Ô vườn ${slotNumber || ''} của bạn đã sẵn sàng sử dụng.`;
       displayButtonLabel = 'Xem chi tiết ô vườn';
     }
@@ -157,12 +157,12 @@ export default function PaymentResultScreen({
   useEffect(() => {
     if (isSuccess) {
       const bannerTitle = isTreePayment
-        ? 'Thanh toán giống cây thành công 🌱'
+        ? 'Thanh toán giống cây thành công'
         : isAddPillar
-        ? 'Thuê thêm trụ thành công 🎉'
+        ? 'Thuê thêm trụ thành công'
         : isExtend
-        ? 'Gia hạn hợp đồng thành công 🎉'
-        : 'Thanh toán thành công 🎉';
+        ? 'Gia hạn hợp đồng thành công'
+        : 'Thanh toán thành công';
       const bannerBody = isTreePayment
         ? 'Yêu cầu trồng cây của bạn đã được ghi nhận. Nhấn để xem chi tiết.'
         : isAddPillar
@@ -188,7 +188,7 @@ export default function PaymentResultScreen({
       });
     } else if (status === 'failed') {
       showInAppNotification({
-        title: 'Thanh toán không thành công ❌',
+        title: 'Thanh toán không thành công',
         body: 'Giao dịch thanh toán chưa hoàn tất. Nhấn để kiểm tra lịch sử.',
         variant: 'warning',
         durationMs: 5000,

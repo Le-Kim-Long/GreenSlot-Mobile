@@ -197,7 +197,7 @@ export default function RegisterScreen({ navigation }: AuthScreenProps<'Register
 
       if (result === true) {
         Alert.alert(
-          'Đăng ký thành công! 🎉',
+          'Đăng ký thành công!',
           'Một mã xác thực OTP đã được gửi đến email của bạn. Vui lòng kiểm tra và xác thực.',
           [{ text: 'Xác thực ngay', onPress: () => navigation.navigate('VerifyOtp', { email: form.email.trim() }) }]
         );

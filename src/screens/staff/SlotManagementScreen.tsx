@@ -269,7 +269,7 @@ export default function SlotManagementScreen() {
             </Text>
             {associatedPillar && (
               <Text style={styles.pillarText}>
-                📍 Cột: {associatedPillar.pillarCode}{locationLabel}
+                Cột: {associatedPillar.pillarCode}{locationLabel}
               </Text>
             )}
           </View>
