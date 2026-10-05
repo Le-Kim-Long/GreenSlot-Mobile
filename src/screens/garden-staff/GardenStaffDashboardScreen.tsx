@@ -21,6 +21,7 @@ import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { useAuth } from '../../context/AuthContext';
+import { localizeIssueText } from '../../utils/taskText';
 import * as ImagePicker from 'expo-image-picker';
 
 import { colors } from '../../theme/colors';
@@ -97,6 +98,7 @@ export default function GardenStaffDashboardScreen() {
   const [issueTask, setIssueTask] = useState<GardeningTaskResponseDTO | null>(null);
   const [issueTitle, setIssueTitle] = useState('');
   const [issueDesc, setIssueDesc] = useState('');
+  const [issueImageUri, setIssueImageUri] = useState<string | null>(null);
   const [isReportingIssue, setIsReportingIssue] = useState(false);
 
   const load = useCallback(async () => {
@@ -105,8 +107,9 @@ export default function GardenStaffDashboardScreen() {
         taskApi.getMyTasks().catch(() => [] as GardeningTaskResponseDTO[]),
         taskApi.getAvailableTasks().catch(() => [] as GardeningTaskResponseDTO[]),
       ]);
-      setMyTasks(mine);
-      setAvailableTasks(avail);
+      const localize = (t: GardeningTaskResponseDTO) => ({ ...t, taskName: localizeIssueText(t.taskName), description: localizeIssueText(t.description) });
+      setMyTasks(mine.map(localize));
+      setAvailableTasks(avail.map(localize));
     } catch {
       setMyTasks([]);
       setAvailableTasks([]);
@@ -172,46 +175,49 @@ export default function GardenStaffDashboardScreen() {
     setCapturedUri(null);
   };
 
-  const handleTakePhoto = async () => {
+  // Mở camera hoặc thư viện, trả về uri ảnh đã chọn (null nếu hủy / lỗi)
+  const pickImageUri = async (fromCamera: boolean): Promise<string | null> => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status } = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền sử dụng Camera để chụp ảnh bằng chứng công việc.');
-        return;
+        Alert.alert('Quyền truy cập', fromCamera
+          ? 'Ứng dụng cần quyền sử dụng Camera để chụp ảnh bằng chứng công việc.'
+          : 'Ứng dụng cần quyền truy cập thư viện ảnh để chọn ảnh bằng chứng.');
+        return null;
       }
-      const result = await ImagePicker.launchCameraAsync({
+      const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
         aspect: [4, 3],
-      });
+      };
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCapturedUri(result.assets[0].uri);
+        return result.assets[0].uri;
       }
     } catch (e: any) {
-      Alert.alert('Lỗi', 'Không thể khởi động camera: ' + (e?.message || ''));
+      Alert.alert('Lỗi', (fromCamera ? 'Không thể khởi động camera: ' : 'Không thể mở thư viện: ') + (e?.message || ''));
     }
+    return null;
+  };
+
+  const handleTakePhoto = async () => {
+    const uri = await pickImageUri(true);
+    if (uri) setCapturedUri(uri);
   };
 
   const handlePickFromGallery = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền truy cập thư viện ảnh để chọn ảnh bằng chứng.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
-        aspect: [4, 3],
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCapturedUri(result.assets[0].uri);
-      }
-    } catch (e: any) {
-      Alert.alert('Lỗi', 'Không thể mở thư viện: ' + (e?.message || ''));
-    }
+    const uri = await pickImageUri(false);
+    if (uri) setCapturedUri(uri);
+  };
+
+  const handlePickIssueImage = async (fromCamera: boolean) => {
+    const uri = await pickImageUri(fromCamera);
+    if (uri) setIssueImageUri(uri);
   };
 
   const handleSubmitEvidence = async () => {
@@ -250,6 +256,7 @@ export default function GardenStaffDashboardScreen() {
     setIssueTask(task);
     setIssueTitle('');
     setIssueDesc('');
+    setIssueImageUri(null);
   };
 
   const handleSubmitIssue = async () => {
@@ -262,12 +269,18 @@ export default function GardenStaffDashboardScreen() {
       Alert.alert('Lỗi', 'Vui lòng nhập mô tả chi tiết sự cố');
       return;
     }
+    if (!issueImageUri) {
+      Alert.alert('Yêu cầu ảnh hiện trường', 'Vui lòng chụp hoặc chọn ảnh hiện trường sự cố để Quản lý nắm rõ.');
+      return;
+    }
 
     setIsReportingIssue(true);
     try {
+      const evidenceImageUrl = await taskApi.uploadEvidenceImage(issueImageUri);
       await taskApi.reportIssue(issueTask.id, {
         issueTitle: issueTitle.trim(),
         description: issueDesc.trim(),
+        evidenceImageUrl,
       });
       Alert.alert('Thành công', 'Đã gửi báo cáo sự cố tới Quản lý!');
       setIssueTask(null);
@@ -888,6 +901,38 @@ export default function GardenStaffDashboardScreen() {
                 numberOfLines={4}
                 textAlignVertical="top"
               />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Ảnh chụp hiện trường *</Text>
+              {issueImageUri ? (
+                <View>
+                  <Image source={{ uri: issueImageUri }} style={styles.issueImagePreview} />
+                  <TouchableOpacity
+                    style={styles.issueImageRemove}
+                    onPress={() => setIssueImageUri(null)}
+                    disabled={isReportingIssue}
+                  >
+                    <X size={14} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              <View style={styles.issueImageRow}>
+                <TouchableOpacity
+                  style={styles.issueImageBtn}
+                  onPress={() => handlePickIssueImage(true)}
+                  disabled={isReportingIssue}
+                >
+                  <Camera size={15} color={colors.gray[700]} style={{ marginRight: 6 }} />
+                  <Text style={styles.issueImageBtnText}>Chụp ảnh</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.issueImageBtn}
+                  onPress={() => handlePickIssueImage(false)}
+                  disabled={isReportingIssue}
+                >
+                  <ImageIcon size={15} color={colors.gray[700]} style={{ marginRight: 6 }} />
+                  <Text style={styles.issueImageBtnText}>Chọn từ thư viện</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.modalFooter}>
@@ -1274,6 +1319,41 @@ const styles = StyleSheet.create({
   },
 
   // Evidence Picker modal
+  issueImagePreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: colors.gray[100],
+  },
+  issueImageRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    padding: 5,
+  },
+  issueImageRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  issueImageBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    backgroundColor: '#fff',
+  },
+  issueImageBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray[800],
+  },
   cameraPickerBox: {
     paddingVertical: 8,
   },
